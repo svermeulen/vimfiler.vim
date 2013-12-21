@@ -865,7 +865,7 @@ function! s:expand_tree(is_recursive) "{{{
 
   if !a:is_recursive && !empty(files)
     " Move to next line.
-    call cursor(line('.')+1, 0)
+    "call cursor(line('.')+1, 0)
   endif
 
   call vimfiler#view#_check_redraw()
@@ -1280,9 +1280,10 @@ function! s:split_edit_file() "{{{
         \ &columns - context.winwidth
   call vimfiler#mappings#do_action(g:vimfiler_split_action)
 
+  exec "normal! \<c-w>=\""
   " Resize.
-  execute 'vertical resize'
-        \ (winnr('$') == 1 ? winwidth : winwidth/(winnr('$') - 1))
+  "execute 'vertical resize'
+        "\ (winnr('$') == 1 ? winwidth : winwidth/(winnr('$') - 1))
 endfunction"}}}
 
 " File operations.
