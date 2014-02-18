@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: init.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 18 Dec 2013.
+" Last Modified: 15 Feb 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -104,10 +104,7 @@ if !has_key(g:vimfiler_extensions, 'multimedia')
 endif
 "}}}
 
-let s:BM = vimfiler#util#get_vital().import('Vim.BufferManager')
-let s:manager = s:BM.new()  " creates new manager
-call s:manager.config('opener', 'silent edit')
-call s:manager.config('range', 'current')
+let s:manager = vimfiler#util#get_vital().import('Vim.Buffer')
 
 let s:loaded_columns = {}
 
@@ -157,9 +154,9 @@ function! vimfiler#init#_context(context) "{{{
     \ 'project' : 0,
     \ 'find' : 0,
     \ 'tab' : 0,
+    \ 'no_focus' : 0,
     \ 'columns' : g:vimfiler_default_columns,
     \ 'vimfiler__prev_bufnr' : bufnr('%'),
-    \ 'vimfiler__prev_winnr' : winbufnr('%'),
     \ 'vimfiler__winfixwidth' : &l:winfixwidth,
     \ 'vimfiler__winfixheight' : &l:winfixheight,
     \ }
@@ -168,6 +165,7 @@ function! vimfiler#init#_context(context) "{{{
     " Change default value.
     let default_context.buffer_name = 'explorer'
     let default_context.split = 1
+    let default_context.simple = 1
     let default_context.toggle = 1
     let default_context.no_quit = 1
     let default_context.winwidth = 35
@@ -272,7 +270,7 @@ function! vimfiler#init#_vimfiler_file(path, lines, dict) "{{{1
   let b:vimfiler.current_file = a:dict
 
   " Clean up the screen.
-  % delete _
+  silent % delete _
 
   augroup vimfiler
     autocmd! * <buffer>
@@ -358,9 +356,9 @@ endfunction"}}}
 
 function! vimfiler#init#_start(path, ...) "{{{
   if vimfiler#util#is_cmdwin()
-    call vimfiler#print_error(
+    call vimfiler#util#print_error(
           \ '[vimfiler] Command line buffer is detected!')
-    call vimfiler#print_error(
+    call vimfiler#util#print_error(
           \ '[vimfiler] Please close command line buffer.')
     return
   endif
@@ -456,6 +454,14 @@ function! vimfiler#init#_switch_vimfiler(bufnr, context, directory) "{{{
   endif
 
   call vimfiler#view#_force_redraw_all_vimfiler()
+
+  if context.no_focus
+    if winbufnr(winnr('#')) > 0
+      wincmd p
+    else
+      execute bufwinnr(a:context.vimfiler__prev_bufnr).'wincmd w'
+    endif
+  endif
 endfunction"}}}
 function! s:create_vimfiler_buffer(path, context) "{{{
   let search_path = fnamemodify(bufname('%'), ':p')
@@ -502,12 +508,12 @@ function! s:create_vimfiler_buffer(path, context) "{{{
 
   try
     set noswapfile
-    let ret = s:manager.open(bufname)
+    let loaded = s:manager.open(bufname, 'silent edit')
   finally
     let &g:swapfile = swapfile_save
   endtry
 
-  if !ret.loaded
+  if !loaded
     call vimshell#echo_error(
           \ '[vimfiler] Failed to open Buffer "'. bufname .'".')
     return
@@ -524,6 +530,14 @@ function! s:create_vimfiler_buffer(path, context) "{{{
     call vimfiler#mappings#search_cursor(
           \ substitute(vimfiler#helper#_get_cd_path(
           \ search_path), '/$', '', ''))
+  endif
+
+  if context.no_focus
+    if winbufnr(winnr('#')) > 0
+      wincmd p
+    else
+      execute bufwinnr(a:context.vimfiler__prev_bufnr).'wincmd w'
+    endif
   endif
 endfunction"}}}
 
