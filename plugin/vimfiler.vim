@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: vimfiler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 18 Dec 2013.
+" Last Modified: 24 Mar 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -70,7 +70,7 @@ command! -nargs=? -complete=customlist,vimfiler#complete VimFilerCurrentDir
       \ call vimfiler#init#_command({}, <q-args> . ' ' . getcwd())
 command! -nargs=? -complete=customlist,vimfiler#complete VimFilerBufferDir
       \ call vimfiler#init#_command({}, <q-args> . ' ' .
-      \ vimfiler#util#substitute_path_separator(fnamemodify(bufname('%'), ':p:h')))
+      \ vimfiler#helper#_get_buffer_directory(bufnr('%')))
 command! -nargs=? -complete=customlist,vimfiler#complete VimFilerCreate
       \ call vimfiler#init#_command({ 'create' : 1 }, <q-args>)
 command! -nargs=? -complete=customlist,vimfiler#complete VimFilerSimple
@@ -92,7 +92,7 @@ augroup vimfiler
         \ call vimfiler#handler#_event_handler('FileAppendCmd')
   autocmd FileReadCmd ??*:{*,*/*}
         \ call vimfiler#handler#_event_handler('FileReadCmd')
-  autocmd BufEnter,VimEnter,BufNew,BufWinEnter
+  autocmd BufEnter,VimEnter,BufNew,BufWinEnter,BufRead,BufCreate
         \ * call s:browse_check(expand('<amatch>'))
 augroup END
 
