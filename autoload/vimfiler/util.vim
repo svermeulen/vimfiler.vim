@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: util.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 29 Mar 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -160,21 +159,24 @@ function! vimfiler#util#set_variables(variables) "{{{
     let save_value = exists(key) ? eval(key) : ''
 
     let variables_save[key] = save_value
-    execute 'let' key '= value'
+    execute 'let' key '=' string(value)
   endfor
 
   return variables_save
 endfunction"}}}
 function! vimfiler#util#restore_variables(variables_save) "{{{
   for [key, value] in items(a:variables_save)
-    execute 'let' key '= value'
+    execute 'let' key '=' string(value)
   endfor
 endfunction"}}}
 
 function! vimfiler#util#alternate_buffer() "{{{
-  if getbufvar('#', '&filetype') !=# 'vimfiler'
-        \ && s:buflisted(bufnr('#'))
-    buffer #
+  let context = vimfiler#get_context()
+
+  if s:buflisted(context.alternate_buffer)
+        \ && getbufvar(context.alternate_buffer, '&filetype') !=# 'vimfiler'
+        \ && g:vimfiler_restore_alternate_file
+    execute 'buffer' context.alternate_buffer
     return
   endif
 
@@ -231,6 +233,12 @@ function! vimfiler#util#get_vimfiler_winnr(buffer_name) "{{{
   endfor
 
   return -1
+endfunction"}}}
+
+function! vimfiler#util#is_sudo() "{{{
+  return $SUDO_USER != '' && $USER !=# $SUDO_USER
+        \ && $HOME !=# expand('~'.$USER)
+        \ && $HOME ==# expand('~'.$SUDO_USER)
 endfunction"}}}
 
 let &cpo = s:save_cpo

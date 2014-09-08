@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: vimfiler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 24 Mar 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -28,16 +27,6 @@ if exists('g:loaded_vimfiler')
   finish
 elseif v:version < 702
   echomsg 'vimfiler does not work this version of Vim "' . v:version . '".'
-  finish
-elseif $SUDO_USER != '' && $USER !=# $SUDO_USER
-      \ && $HOME !=# expand('~'.$USER)
-      \ && $HOME ==# expand('~'.$SUDO_USER)
-  echohl Error
-  echomsg 'vimfiler disabled: "sudo vim" is detected and $HOME is set to '
-        \.'your user''s home. '
-        \.'You may want to use the sudo.vim plugin, the "-H" option '
-        \.'with "sudo" or set always_set_home in /etc/sudoers instead.'
-  echohl None
   finish
 endif
 

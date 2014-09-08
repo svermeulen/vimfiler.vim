@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: handler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Mar 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -28,9 +27,10 @@ let s:save_cpo = &cpo
 set cpo&vim
 
 function! vimfiler#handler#_event_handler(event_name, ...)  "{{{1
-  let context = vimfiler#initialize_context(get(a:000, 0, {}))
-  let path = get(context, 'path',
-        \ vimfiler#util#substitute_path_separator(expand('<afile>')))
+  let user_context = get(a:000, 0, {})
+  let context = vimfiler#initialize_context(user_context)
+  let path = vimfiler#util#substitute_path_separator(
+        \ get(user_context, 'path', expand('<afile>')))
 
   if filereadable(path)
     call vimfiler#util#print_error(
@@ -148,11 +148,8 @@ endfunction"}}}
 
 " Event functions.
 function! vimfiler#handler#_event_bufwin_enter(bufnr) "{{{
-  let prev_winnr = winnr('#')
-
   if a:bufnr != bufnr('%') && bufwinnr(a:bufnr) > 0
     let winnr = winnr()
-    let prev_winnr = winnr
     execute bufwinnr(a:bufnr) 'wincmd w'
   endif
 
@@ -171,14 +168,14 @@ function! vimfiler#handler#_event_bufwin_enter(bufnr) "{{{
     endif
 
     let context = vimfiler#get_context()
-    if context.winwidth != 0
+    if context.winwidth > 0
       execute 'vertical resize' context.winwidth
 
       let context.vimfiler__winfixwidth = &l:winfixwidth
       if context.split
         setlocal winfixwidth
       endif
-    elseif context.winheight != 0
+    elseif context.winheight > 0
       execute 'resize' context.winheight
       if line('.') < winheight(0)
         normal! zb
@@ -214,9 +211,9 @@ function! vimfiler#handler#_event_bufwin_leave(bufnr) "{{{
 
   " Restore winfix.
   let context = vimfiler.context
-  if context.winwidth != 0 && context.split
+  if context.winwidth > 0 && context.split
     let &l:winfixwidth = context.vimfiler__winfixwidth
-  elseif context.winheight != 0 && context.split
+  elseif context.winheight > 0 && context.split
     let &l:winfixheight = context.vimfiler__winfixheight
   endif
 endfunction"}}}

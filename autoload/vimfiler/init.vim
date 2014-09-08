@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: init.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 15 Feb 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -38,8 +37,6 @@ let g:vimfiler_sort_type =
       \ get(g:, 'vimfiler_sort_type', 'filename')
 let g:vimfiler_directory_display_top =
       \ get(g:, 'vimfiler_directory_display_top', 1)
-let g:vimfiler_split_rule =
-      \ get(g:, 'vimfiler_split_rule', 'topleft')
 let g:vimfiler_max_directories_history =
       \ get(g:, 'vimfiler_max_directories_history', 50)
 let g:vimfiler_safe_mode_by_default =
@@ -62,18 +59,16 @@ let g:vimfiler_readonly_file_icon =
       \ get(g:, 'vimfiler_readonly_file_icon', 'X')
 let g:vimfiler_marked_file_icon =
       \ get(g:, 'vimfiler_marked_file_icon', '*')
-let g:vimfiler_enable_auto_cd =
-      \ get(g:, 'vimfiler_enable_auto_cd', 0)
 let g:vimfiler_quick_look_command =
       \ get(g:, 'vimfiler_quick_look_command', '')
-let g:vimfiler_default_columns =
-      \ get(g:, 'vimfiler_default_columns', 'type:size:time')
 let g:vimfiler_explorer_columns =
       \ get(g:, 'vimfiler_explorer_columns', 'type')
 let g:vimfiler_ignore_pattern =
       \ get(g:, 'vimfiler_ignore_pattern', '^\.')
 let g:vimfiler_expand_jump_to_first_child =
       \ get(g:, 'vimfiler_expand_jump_to_first_child', 1)
+let g:vimfiler_restore_alternate_file =
+      \ get(g:, 'vimfiler_restore_alternate_file', 1)
 
 let g:vimfiler_execute_file_list =
       \ get(g:, 'vimfiler_execute_file_list', {})
@@ -110,6 +105,9 @@ let s:manager = vimfiler#util#get_vital().import('Vim.Buffer')
 
 let s:loaded_columns = {}
 
+function! vimfiler#init#_initialize() "{{{
+  " Dummy initialize
+endfunction"}}}
 function! vimfiler#init#_command(default, args) "{{{
   let args = []
   let options = a:default
@@ -117,7 +115,7 @@ function! vimfiler#init#_command(default, args) "{{{
     let arg = substitute(arg, '\\\( \)', '\1', 'g')
 
     let arg_key = substitute(arg, '=\zs.*$', '', '')
-    let matched_list = filter(copy(vimfiler#get_options()),
+    let matched_list = filter(copy(vimfiler#variables#options()),
           \  'v:val ==# arg_key')
     for option in matched_list
       let key = substitute(substitute(option, '-', '_', 'g'),
@@ -135,33 +133,8 @@ function! vimfiler#init#_command(default, args) "{{{
   call vimfiler#init#_start(join(args), options)
 endfunction"}}}
 function! vimfiler#init#_context(context) "{{{
-  let default_context = {
-    \ 'buffer_name' : 'default',
-    \ 'no_quit' : 0,
-    \ 'quit' : 0,
-    \ 'toggle' : 0,
-    \ 'create' : 0,
-    \ 'simple' : 0,
-    \ 'double' : 0,
-    \ 'split' : 0,
-    \ 'status' : 0,
-    \ 'horizontal' : 0,
-    \ 'winheight' : 0,
-    \ 'winwidth' : 0,
-    \ 'winminwidth' : 0,
-    \ 'direction' : g:vimfiler_split_rule,
-    \ 'auto_cd' : g:vimfiler_enable_auto_cd,
-    \ 'explorer' : 0,
-    \ 'reverse' : 0,
-    \ 'project' : 0,
-    \ 'find' : 0,
-    \ 'tab' : 0,
-    \ 'no_focus' : 0,
-    \ 'columns' : g:vimfiler_default_columns,
-    \ 'vimfiler__prev_bufnr' : bufnr('%'),
-    \ 'vimfiler__winfixwidth' : &l:winfixwidth,
-    \ 'vimfiler__winfixheight' : &l:winfixheight,
-    \ }
+  let default_context = extend(copy(vimfiler#variables#default_context()),
+        \ vimfiler#custom#get_profile('default', 'context'))
 
   if get(a:context, 'explorer', 0)
     " Change default value.
@@ -169,16 +142,29 @@ function! vimfiler#init#_context(context) "{{{
     let default_context.split = 1
     let default_context.simple = 1
     let default_context.toggle = 1
-    let default_context.no_quit = 1
+    let default_context.quit = 0
     let default_context.winwidth = 35
     let default_context.columns = g:vimfiler_explorer_columns
   endif
 
+  let profile_name = get(a:context, 'profile_name',
+        \ get(a:context, 'buffer_name', 'default'))
+
+  if profile_name !=# 'default'
+    " Overwrite default_context by profile context.
+    call extend(default_context,
+          \ unite#custom#get_profile(profile_name, 'context'))
+  endif
+
   let context = extend(default_context, a:context)
 
-  if !has_key(context, 'profile_name')
-    let context.profile_name = context.buffer_name
-  endif
+  " Generic no.
+  for option in map(filter(items(context),
+        \ "stridx(v:val[0], 'no_') == 0 && v:val[1]"), 'v:val[0]')
+    let context[option[3:]] = 0
+  endfor
+
+  let context.profile_name = profile_name
   if context.toggle && context.find
     " Disable toggle feature.
     let context.toggle = 0
@@ -186,6 +172,7 @@ function! vimfiler#init#_context(context) "{{{
   if context.tab
     " Force create new vimfiler buffer.
     let context.create = 1
+    let context.alternate_buffer = -1
   endif
 
   return context
@@ -217,7 +204,7 @@ function! vimfiler#init#_vimfiler_directory(directory, context) "{{{1
 
   let b:vimfiler.global_sort_type = g:vimfiler_sort_type
   let b:vimfiler.local_sort_type = g:vimfiler_sort_type
-  let b:vimfiler.is_safe_mode = g:vimfiler_safe_mode_by_default
+  let b:vimfiler.is_safe_mode = a:context.safe
   let b:vimfiler.winwidth = winwidth(0)
   let b:vimfiler.another_vimfiler_bufnr = -1
   let b:vimfiler.prompt_linenr =
@@ -243,16 +230,11 @@ function! vimfiler#init#_vimfiler_directory(directory, context) "{{{1
     wincmd p
   endif
 
-  if a:context.winwidth != 0
+  if a:context.winwidth > 0
     execute 'vertical resize' a:context.winwidth
   endif
 
-  " Defind syntax.
-  for column in filter(
-        \ copy(b:vimfiler.columns), "get(v:val, 'syntax', '') != ''")
-    call column.define_syntax(b:vimfiler.context)
-  endfor
-
+  call vimfiler#view#_define_syntax()
   call vimfiler#view#_force_redraw_all_vimfiler()
 
   " Initialize cursor position.
@@ -262,6 +244,8 @@ function! vimfiler#init#_vimfiler_directory(directory, context) "{{{1
     " Change current directory.
     call vimfiler#mappings#_change_vim_current_dir()
   endif
+
+  call vimfiler#mappings#cd(b:vimfiler.current_dir)
 endfunction"}}}
 function! vimfiler#init#_vimfiler_file(path, lines, dict) "{{{1
   " Set current unite.
@@ -383,6 +367,10 @@ function! vimfiler#init#_start(path, ...) "{{{
     endif
   endif
 
+  if context.project
+    let path = vimfiler#util#path2project_directory(path)
+  endif
+
   if !context.create
     " Search vimfiler buffer.
     for bufnr in filter(insert(range(1, bufnr('$')), bufnr('%')),
@@ -393,6 +381,7 @@ function! vimfiler#init#_start(path, ...) "{{{
             \ && vimfiler.context.profile_name ==# context.profile_name
             \ && (!exists('t:unite_buffer_dictionary')
             \      || has_key(t:unite_buffer_dictionary, bufnr))
+            \ && (!context.invisible || bufwinnr(bufnr) < 0)
         call vimfiler#init#_switch_vimfiler(bufnr, context, path)
         return
       endif
@@ -404,9 +393,17 @@ function! vimfiler#init#_start(path, ...) "{{{
   call s:create_vimfiler_buffer(path, context)
 endfunction"}}}
 function! vimfiler#init#_switch_vimfiler(bufnr, context, directory) "{{{
+  if a:bufnr < 0
+    call s:create_vimfiler_buffer(a:directory, a:context)
+    return
+  endif
+
   let search_path = fnamemodify(bufname('%'), ':p')
 
   let context = vimfiler#initialize_context(a:context)
+  if !context.tab
+    let context.alternate_buffer = bufnr('%')
+  endif
 
   if bufwinnr(a:bufnr) < 0
     if context.split
@@ -457,7 +454,7 @@ function! vimfiler#init#_switch_vimfiler(bufnr, context, directory) "{{{
 
   call vimfiler#view#_force_redraw_all_vimfiler()
 
-  if context.no_focus
+  if !context.focus
     if winbufnr(winnr('#')) > 0
       wincmd p
     else
@@ -493,7 +490,6 @@ function! s:create_vimfiler_buffer(path, context) "{{{
   let bufname = prefix . postfix
 
   " Set buffer_name.
-  let context.profile_name = context.buffer_name
   let context.buffer_name = bufname
 
   if context.split
@@ -534,7 +530,7 @@ function! s:create_vimfiler_buffer(path, context) "{{{
           \ search_path), '/$', '', ''))
   endif
 
-  if context.no_focus
+  if !context.focus
     if winbufnr(winnr('#')) > 0
       wincmd p
     else
@@ -554,6 +550,8 @@ function! vimfiler#init#_default_settings() "{{{
           \ call vimfiler#handler#_event_bufwin_leave(expand('<abuf>'))
     autocmd CursorMoved <buffer>
           \ call vimfiler#handler#_event_cursor_moved()
+    autocmd FocusGained <buffer>
+          \ call vimfiler#view#_force_redraw_all_vimfiler()
     autocmd VimResized <buffer>
           \ call vimfiler#view#_redraw_all_vimfiler()
   augroup end"}}}

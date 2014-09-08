@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: variables.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 04 Feb 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,6 +26,11 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
+" Global options definition. "{{{
+let g:vimfiler_default_columns =
+      \ get(g:, 'vimfiler_default_columns', 'type:size:time')
+"}}}
+
 function! vimfiler#variables#get_clipboard() "{{{
   if !exists('s:clipboard')
     let s:clipboard = {'operation' : '', 'files' : []}
@@ -38,13 +42,83 @@ endfunction"}}}
 function! vimfiler#variables#get_data_directory() "{{{
   let g:vimfiler_data_directory =
         \ substitute(fnamemodify(get(
-        \   g:, 'vimfiler_data_directory', '~/.cache/vimfiler'),
+        \   g:, 'vimfiler_data_directory',
+        \  ($XDG_CACHE_DIR != '' ?
+        \   $XDG_CACHE_DIR . '/vimfiler' : expand('~/.cache/vimfiler'))),
         \  ':p'), '\\', '/', 'g')
-  if !isdirectory(g:vimfiler_data_directory)
+  if !isdirectory(g:vimfiler_data_directory) && !vimfiler#util#is_sudo()
     call mkdir(g:vimfiler_data_directory, 'p')
   endif
 
   return g:vimfiler_data_directory
+endfunction"}}}
+
+function! vimfiler#variables#default_context() "{{{
+  if !exists('s:default_context')
+    call s:initialize_default_options()
+  endif
+
+  return deepcopy(s:default_context)
+endfunction"}}}
+
+function! vimfiler#variables#options() "{{{
+  if !exists('s:options')
+    let s:options = map(filter(items(vimfiler#variables#default_context()),
+          \ "v:val[0] !~ '^vimfiler__'"),
+          \ "'-' . substitute(v:val[0], '_', '-', 'g') .
+          \ (type(v:val[1]) == type(0) && (v:val[1] == 0 || v:val[1] == 1) ?
+          \   '' : '=')")
+
+    " Generic no options.
+    let s:options += map(filter(copy(s:options),
+          \ "v:val[-1:] != '='"), "'-no' . v:val")
+  endif
+
+  return deepcopy(s:options)
+endfunction"}}}
+
+function! s:initialize_default_options() "{{{
+  let s:default_context = {
+        \ 'buffer_name' : 'default',
+        \ 'quit' : 1,
+        \ 'force_quit' : 0,
+        \ 'toggle' : 0,
+        \ 'create' : 0,
+        \ 'simple' : 0,
+        \ 'double' : 0,
+        \ 'split' : 0,
+        \ 'status' : 0,
+        \ 'horizontal' : 0,
+        \ 'winheight' : -1,
+        \ 'winwidth' : -1,
+        \ 'winminwidth' : -1,
+        \ 'direction' : 'topleft',
+        \ 'auto_cd' : 0,
+        \ 'explorer' : 0,
+        \ 'reverse' : 0,
+        \ 'project' : 0,
+        \ 'find' : 0,
+        \ 'tab' : 0,
+        \ 'alternate_buffer' : bufnr('%'),
+        \ 'focus' : 1,
+        \ 'invisible' : 0,
+        \ 'columns' : 'type:size:time',
+        \ 'safe' : 1,
+        \ 'auto_expand' : 0,
+        \ 'vimfiler__prev_bufnr' : bufnr('%'),
+        \ 'vimfiler__winfixwidth' : &l:winfixwidth,
+        \ 'vimfiler__winfixheight' : &l:winfixheight,
+        \ }
+
+  " For compatibility(deprecated variables)
+  for [context, var] in filter([
+        \ ['direction', 'g:vimfiler_split_rule'],
+        \ ['auto_cd', 'g:vimfiler_enable_auto_cd'],
+        \ ['columns', 'g:vimfiler_default_columns'],
+        \ ['safe', 'g:vimfiler_safe_mode_by_default'],
+        \ ], "exists(v:val[1])")
+    let s:default_context[context] = {var}
+  endfor
 endfunction"}}}
 
 let &cpo = s:save_cpo

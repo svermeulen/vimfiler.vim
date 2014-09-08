@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: helper.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 11 Mar 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -52,16 +51,20 @@ function! vimfiler#helper#_get_directory_files(directory, ...) "{{{
     let file.vimfiler__nest_level = 0
   endfor
 
-  let dirs = filter(copy(current_files), 'v:val.vimfiler__is_directory')
-  let files = filter(copy(current_files), '!v:val.vimfiler__is_directory')
+  return vimfiler#helper#_sort_files(current_files)
+endfunction"}}}
+function! vimfiler#helper#_sort_files(files) "{{{
+  let files = a:files
+  let dirs = filter(copy(a:files), 'v:val.vimfiler__is_directory')
+  let files = filter(copy(a:files), '!v:val.vimfiler__is_directory')
   if g:vimfiler_directory_display_top
-    let current_files = s:sort(dirs, b:vimfiler.local_sort_type)
+    let files = s:sort(dirs, b:vimfiler.local_sort_type)
           \+ s:sort(files, b:vimfiler.local_sort_type)
   else
-    let current_files = s:sort(files + dirs, b:vimfiler.local_sort_type)
+    let files = s:sort(files + dirs, b:vimfiler.local_sort_type)
   endif
 
-  return current_files
+  return files
 endfunction"}}}
 function! vimfiler#helper#_parse_path(path) "{{{
   let path = a:path
@@ -156,14 +159,10 @@ function! vimfiler#helper#_get_cd_path(dir) "{{{
 endfunction"}}}
 
 function! vimfiler#helper#_complete(arglead, cmdline, cursorpos) "{{{
-  let ret = vimfiler#parse_path(join(split(a:cmdline)[1:]))
-  let source_name = ret[0]
-  let source_args = ret[1:]
-
   let _ = []
 
   " Option names completion.
-  let _ +=  filter(vimfiler#get_options(),
+  let _ +=  filter(vimfiler#variables#options(),
         \ 'stridx(v:val, a:arglead) == 0')
 
   " Source path completion.
@@ -215,12 +214,12 @@ function! vimfiler#helper#_get_file_directory(...) "{{{
   if empty(file)
     let directory = vimfiler#get_current_vimfiler().current_dir
   else
-    let directory = file.action__directory
+    let directory = unite#helper#get_candidate_directory(file)
 
     if file.vimfiler__is_directory
           \ && !file.vimfiler__is_opened
       let directory = vimfiler#util#substitute_path_separator(
-            \ fnamemodify(file.action__directory, ':h'))
+            \ fnamemodify(directory, ':h'))
     endif
   endif
 

@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: view.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Mar 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -26,9 +25,6 @@
 
 let s:save_cpo = &cpo
 set cpo&vim
-
-let g:vimfiler_draw_files_limit =
-      \ get(g:, 'vimfiler_draw_files_limit', 0)
 
 let g:vimfiler_min_cache_files =
       \ get(g:, 'vimfiler_min_cache_files', 100)
@@ -66,12 +62,16 @@ function! vimfiler#view#_force_redraw_screen(...) "{{{
         \ || (b:vimfiler.source ==# 'file' &&
         \     s:Cache.check_old_cache(cache_dir, b:vimfiler.current_dir))
     " Get files.
-    let files = vimfiler#get_directory_files(b:vimfiler.current_dir, is_manualed)
-    if len(files) >= g:vimfiler_min_cache_files
-      call s:Cache.writefile(cache_dir, b:vimfiler.current_dir, [string(files)])
+    let files = vimfiler#get_directory_files(
+          \ b:vimfiler.current_dir, is_manualed)
+    if len(files) >= g:vimfiler_min_cache_files && !vimfiler#util#is_sudo()
+      call s:Cache.writefile(cache_dir,
+            \ b:vimfiler.current_dir, [string(files)])
     endif
   else
-    sandbox let files = eval(s:Cache.readfile(cache_dir, b:vimfiler.current_dir)[0])
+    sandbox let files = eval(s:Cache.readfile(
+          \ cache_dir, b:vimfiler.current_dir)[0])
+    let files = vimfiler#helper#_sort_files(files)
   endif
 
   " Use matcher_glob.
@@ -95,14 +95,12 @@ function! vimfiler#view#_force_redraw_screen(...) "{{{
   call vimfiler#view#_redraw_screen()
 endfunction"}}}
 function! vimfiler#view#_redraw_screen(...) "{{{
-  let is_all = get(a:000, 0, 0)
-
   let is_switch = &filetype !=# 'vimfiler'
+  let save_winnr = winnr()
   if is_switch
     " Switch vimfiler.
     let vimfiler = vimfiler#get_current_vimfiler()
 
-    let save_winnr = winnr()
     let winnr = bufwinnr(vimfiler.bufnr)
     if winnr < 0
       " Not vimfiler window.
@@ -136,11 +134,10 @@ function! vimfiler#view#_redraw_screen(...) "{{{
 
   let b:vimfiler.winwidth = (winwidth(0)+1)/2*2
 
-  let b:vimfiler.current_files = (is_all || g:vimfiler_draw_files_limit <= 0) ?
-        \ b:vimfiler.all_files : b:vimfiler.all_files[ :
-        \      max([g:vimfiler_draw_files_limit, winheight(0) * 2]) - 1]
+  let b:vimfiler.current_files = b:vimfiler.all_files
 
   setlocal modifiable
+  setlocal noreadonly
 
   try
     let last_line = line('.')
@@ -159,6 +156,7 @@ function! vimfiler#view#_redraw_screen(...) "{{{
           \ vimfiler#view#_get_print_lines(b:vimfiler.current_files))
   finally
     setlocal nomodifiable
+    setlocal readonly
   endtry
 
   let index = index(b:vimfiler.current_files, current_file)
@@ -216,13 +214,17 @@ function! s:redraw_prompt() "{{{
     return
   endif
 
-  let mask = !b:vimfiler.is_visible_ignore_files
-        \ && b:vimfiler.current_mask == '' ?
+  let mask = (!b:vimfiler.is_visible_ignore_files
+        \      && b:vimfiler.current_mask == '') ?
         \ '' : '[' . (b:vimfiler.is_visible_ignore_files ? '.:' : '')
         \       . b:vimfiler.current_mask . ']'
 
-  let prefix = (b:vimfiler.is_safe_mode ? '[safe] ' : '') .
-        \ (b:vimfiler.source ==# 'file' ? '' : b:vimfiler.source.':')
+  let sort = (b:vimfiler.local_sort_type ==# g:vimfiler_sort_type) ?
+        \ '' : ' <' . b:vimfiler.local_sort_type . '>'
+
+  let safe = (b:vimfiler.is_safe_mode) ? ' *safe*' : ''
+
+  let prefix = (b:vimfiler.source ==# 'file') ? '' : b:vimfiler.source.':'
 
   let dir = b:vimfiler.current_dir
   if b:vimfiler.source ==# 'file'
@@ -239,39 +241,44 @@ function! s:redraw_prompt() "{{{
   if dir !~ '/$'
     let dir .= '/'
   endif
-  let b:vimfiler.status = prefix .  dir . mask
+  let b:vimfiler.status = prefix .  dir . mask . sort . safe
 
   let context = vimfiler#get_context()
 
   " Append up directory.
   let modifiable_save = &l:modifiable
+  let readonly_save = &l:readonly
   setlocal modifiable
+  setlocal noreadonly
 
-  if getline(b:vimfiler.prompt_linenr) != '..'
-    if line('$') == 1
-      " Note: Dirty Hack for open file.
-      call append(1, '')
-      call setline(2, '..')
-      silent delete _
-    else
-      call setline(1, '..')
+  try
+    if getline(b:vimfiler.prompt_linenr) != '..'
+      if line('$') == 1
+        " Note: Dirty Hack for open file.
+        call append(1, '')
+        call setline(2, '..')
+        silent delete _
+      else
+        call setline(1, '..')
+      endif
     endif
-  endif
 
-  if context.status || context.explorer
-    if getline(1) == '..'
-      call append(0, '[in]: ' . b:vimfiler.status)
-    else
-      call setline(1, '[in]: ' . b:vimfiler.status)
+    if context.status || context.explorer
+      if getline(1) == '..'
+        call append(0, '[in]: ' . b:vimfiler.status)
+      else
+        call setline(1, '[in]: ' . b:vimfiler.status)
+      endif
     endif
-  endif
 
-  if context.explorer
-    " Delete prompt
-    silent 1,2delete _
-  endif
-
-  let &l:modifiable = modifiable_save
+    if context.explorer
+      " Delete prompt
+      silent 1,2delete _
+    endif
+  finally
+    let &l:modifiable = modifiable_save
+    let &l:readonly = readonly_save
+  endtry
 endfunction"}}}
 function! vimfiler#view#_get_print_lines(files) "{{{
   " Clear previous syntax.
@@ -287,7 +294,7 @@ function! vimfiler#view#_get_print_lines(files) "{{{
   let start = max_len + 1
   let syntaxes = [
             \ [vimfiler#util#wcswidth(
-            \  g:vimfiler_tree_opened_icon), 'vimfilerOpendFile'],
+            \  g:vimfiler_tree_opened_icon), 'vimfilerOpenedFile'],
             \ [vimfiler#util#wcswidth(
             \  g:vimfiler_tree_closed_icon), 'vimfilerClosedFile'],
             \ [vimfiler#util#wcswidth(
@@ -299,7 +306,7 @@ function! vimfiler#view#_get_print_lines(files) "{{{
     " Optimize if columns are same.
     let syntaxes = [[vimfiler#util#wcswidth(
             \  g:vimfiler_file_icon),
-            \  'vimfilerNormalFile,vimfilerOpendFile,'.
+            \  'vimfilerNormalFile,vimfilerOpenedFile,'.
             \  'vimfilerClosedFile,vimfilerROFile']]
   endif
   for column in columns
@@ -376,7 +383,6 @@ endfunction"}}}
 function! vimfiler#view#_get_max_len(files) "{{{
   let columns = (b:vimfiler.context.simple) ? [] : b:vimfiler.columns
 
-  let start = 0
   for column in columns
     let column.vimfiler__length = column.length(
           \ a:files, b:vimfiler.context)
@@ -402,6 +408,12 @@ function! vimfiler#view#_get_max_len(files) "{{{
   endif
 
   return max([max([winwidth(0), &winwidth]) - padding, 10])
+endfunction"}}}
+function! vimfiler#view#_define_syntax() "{{{
+  for column in filter(
+        \ copy(b:vimfiler.columns), "get(v:val, 'syntax', '') != ''")
+    call column.define_syntax(b:vimfiler.context)
+  endfor
 endfunction"}}}
 
 function! s:check_tree(files) "{{{

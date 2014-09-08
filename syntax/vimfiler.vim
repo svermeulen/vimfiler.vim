@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: syntax/vimfiler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 01 Jan 2014.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -30,6 +29,8 @@ elseif exists('b:current_syntax')
   finish
 endif
 
+call vimfiler#init#_initialize()
+
 " Initialize icon patterns."{{{
 let s:leaf_icon = vimfiler#util#escape_pattern(
       \ g:vimfiler_tree_leaf_icon)
@@ -48,7 +49,7 @@ execute 'syntax match   vimfilerNormalFile'
       \ '''^\s*\%('.s:leaf_icon.'\)\?'.
       \ s:file_icon.' .*'' contains=vimfilerNonMark oneline'
 
-execute 'syntax match   vimfilerOpendFile'
+execute 'syntax match   vimfilerOpenedFile'
       \ '''^\s*\%('.s:leaf_icon.'\)\?'.
       \ s:opened_icon.' .*'' contains=vimfilerNonMark oneline'
 execute 'syntax match   vimfilerClosedFile'
@@ -62,9 +63,13 @@ execute 'syntax match   vimfilerMarkedFile'
       \ '''^\s*\%('  . s:leaf_icon .'\)\?'
       \ . s:marked_file_icon . ' .*$'''
 
+execute 'syntax match   vimfilerLeaf'
+      \ '''^\s*'  . s:leaf_icon . ''' contained'
+
 execute 'syntax match   vimfilerNonMark'
       \ '''^\s*\%('.s:leaf_icon.'\)\?\%('.s:opened_icon.'\|'
-      \ .s:closed_icon.'\|'.s:ro_file_icon.'\|'.s:file_icon.'\) '' contained'
+      \ .s:closed_icon.'\|'.s:ro_file_icon.'\|'.s:file_icon.'\) ''
+      \ contained contains=vimfilerLeaf'
 
 unlet s:opened_icon
 unlet s:closed_icon
@@ -87,21 +92,17 @@ highlight def link vimfilerMask Statement
 
 highlight def link vimfilerNonMark Special
 highlight def link vimfilerMarkedFile Type
-highlight def link vimfilerDirectory Preproc
 
-highlight def link vimfilerOpendFile Preproc
+highlight def link vimfilerDirectory Preproc
+highlight def link vimfilerOpenedFile Preproc
 highlight def link vimfilerClosedFile Preproc
 highlight def link vimfilerROFile Comment
+highlight def link vimfilerLeaf Special
 
 let b:current_syntax = 'vimfiler'
 
-if !empty(b:vimfiler.syntaxes)
-  " Redraw syntax.
-  for column in filter(
-        \ copy(b:vimfiler.columns), "get(v:val, 'syntax', '') != ''")
-    call column.define_syntax(b:vimfiler.context)
-  endfor
-
+if exists('b:vimfiler') && !empty(b:vimfiler.syntaxes)
+  call vimfiler#view#_define_syntax()
   call vimfiler#view#_redraw_screen()
 endif
 

@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: vimfiler/execute.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 19 Sep 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -39,11 +38,21 @@ let s:source = {
       \ }
 
 function! s:source.hooks.on_init(args, context) "{{{
+  let winnr = winnr()
+  try
+    execute a:context.vimfiler__winnr.'wincmd w'
+
+    if &filetype !=# 'vimfiler'
+      return []
+    endif
+
+    let a:context.source__file = vimfiler#get_file(line('.'))
+  finally
+    execute winnr.'wincmd w'
+  endtry
   if &filetype !=# 'vimfiler'
     return
   endif
-
-  let a:context.source__file = vimfiler#get_file(line('.'))
 endfunction"}}}
 
 function! s:source.gather_candidates(args, context) "{{{
@@ -62,10 +71,10 @@ function! s:source.gather_candidates(args, context) "{{{
     let dict = { 'word' : command }
 
     if command ==# 'vim'
-      " Edit with vim.
-      let dict.kind = 'file'
-      let dict.action__path =
-            \ a:context.source__file.action__path
+        call unite#print_error(printf(
+              \ '[vimfiler/execute] You cannot edit "%s" by vimfiler/execute.',
+              \ a:context.source__file.action__path))
+        return []
     elseif !executable(command)
         call unite#print_error(printf(
               \ '[vimfiler/execute] Command "%s" is not executable file.', command))

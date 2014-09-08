@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: size.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 13 Oct 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -54,11 +53,12 @@ function! s:column.get(file, context) "{{{
 
   " Get human file size.
   let filesize = a:file.vimfiler__filesize
+  let size = 0
   if filesize < 0
-    if a:file.action__path !~ '^\a\w\+:' &&
-          \ (has('python3') || has('python'))
+    if a:file.action__path !~ '^\a\w\+:'
+          \ && has('lua')
           \ && getftype(a:file.action__path) !=# 'link'
-      let pattern = s:get_python_file_size(a:file.action__path)
+      let pattern = s:get_lua_file_size(a:file.action__path)
     elseif filesize == -2
       " Above 2GB?
       let pattern = '>2.00'
@@ -93,32 +93,30 @@ function! s:column.get(file, context) "{{{
           \ printf('%2d.%01d', digit, float/10)
   endif
 
-  return pattern.suffix
+  return pattern . suffix
 endfunction"}}}
 
-function! s:get_python_file_size(filename) "{{{
-  " Use python interface.
-execute (has('python3') ? 'python3' : 'python') ' <<END'
-import os.path
-import vim
-try:
-  filesize = os.path.getsize(vim.eval(\
-  'unite#util#iconv(a:filename, &encoding, "char")'))
-except:
-  filesize = -1
-
-if filesize < 0:
-  pattern = ''
-else:
-  mega = filesize / 1024 / 1024
-  float = int((mega%1024)*100/1024)
-  pattern = '%2d.%02d' % (mega/1024, float)
-
-vim.command("let pattern = '%s'" % pattern)
-END
+" @vimlint(EVL101, 1, l:pattern)
+function! s:get_lua_file_size(filename) "{{{
+  lua << EOF
+do
+  local file = io.open(vim.eval('iconv(a:filename, &encoding, "char")'))
+  local pattern
+  if file ~= nil then
+    local mega = math.floor(file:seek('end') / (1024 * 1024) + 0.5)
+    local float = math.floor((mega%1024)*100/1024 + 0.5)
+    pattern = string.format('%2d.%02d', math.floor(mega/1024), float)
+    file:close()
+  else
+    pattern = ''
+  end
+  vim.command('let pattern = "' .. pattern .. '"')
+end
+EOF
 
   return pattern
 endfunction"}}}
+" @vimlint(EVL101, 0, l:pattern)
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

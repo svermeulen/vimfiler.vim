@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: vimfiler/mask.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 25 Dec 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -47,10 +46,10 @@ function! s:source.hooks.on_init(args, context) "{{{
   endif
 
   let a:context.source__mask = b:vimfiler.current_mask
-  let a:context.source__candidates =
-        \ vimfiler#get_directory_files(b:vimfiler.current_dir)
+  let a:context.source__candidates = b:vimfiler.current_files
 
-  call unite#print_message('[vimfiler/mask] Current mask: ' . a:context.source__mask)
+  call unite#print_message(
+        \ '[vimfiler/mask] Current mask: ' . a:context.source__mask)
 endfunction"}}}
 
 function! s:source.change_candidates(args, context) "{{{
@@ -60,8 +59,12 @@ function! s:source.change_candidates(args, context) "{{{
 
   return map(add(copy(a:context.source__candidates), {
         \ 'vimfiler__abbr' : 'New mask: "' . a:context.input . '"',
-        \ 'vimfiler__is_directory' : 0,}), "{
+        \ 'vimfiler__is_directory' : 0,
+        \ 'vimfiler__nest_level' : 0}), "{
         \ 'word' : v:val.vimfiler__abbr .
+        \        (v:val.vimfiler__is_directory ? '/' : ''),
+        \ 'abbr' : repeat(' ', v:val.vimfiler__nest_level
+         \       * g:vimfiler_tree_indentation) . v:val.vimfiler__abbr .
         \        (v:val.vimfiler__is_directory ? '/' : ''),
         \ 'vimfiler__is_directory' : v:val.vimfiler__is_directory,
         \ 'vimfiler__abbr' : v:val.vimfiler__abbr,

@@ -1,5 +1,5 @@
 "=============================================================================
-" FILE: syntax/exrename.vim
+" FILE: custom.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
@@ -23,17 +23,52 @@
 " }}}
 "=============================================================================
 
-if version < 700
-  syntax clear
-elseif exists('b:current_syntax')
-  finish
-endif
+let s:save_cpo = &cpo
+set cpo&vim
 
-syntax match exrenameModified '^.*$'
+function! vimfiler#custom#get() "{{{
+  if !exists('s:custom')
+    let s:custom = {}
+    let s:custom.profiles = {}
+  endif
 
-highlight def link exrenameModified Todo
-highlight def link exrenameOriginal Normal
+  return s:custom
+endfunction"}}}
 
-let b:current_syntax = 'exrename'
+function! vimfiler#custom#profile(profile_name, option_name, value) "{{{
+  let custom = vimfiler#custom#get()
+  let profile_name =
+        \ has_key(custom.profiles, a:profile_name) ?
+        \ a:profile_name : 'default'
+
+  for key in split(profile_name, '\s*,\s*')
+    if !has_key(custom.profiles, key)
+      let custom.profiles[key] = s:init_profile()
+    endif
+
+    let custom.profiles[key][a:option_name] = a:value
+  endfor
+endfunction"}}}
+function! vimfiler#custom#get_profile(profile_name, option_name) "{{{
+  let custom = vimfiler#custom#get()
+  let profile_name =
+        \ has_key(custom.profiles, a:profile_name) ?
+        \ a:profile_name : 'default'
+
+  if !has_key(custom.profiles, profile_name)
+    let custom.profiles[profile_name] = s:init_profile()
+  endif
+
+  return custom.profiles[profile_name][a:option_name]
+endfunction"}}}
+
+function! s:init_profile() "{{{
+  return {
+        \ 'context' : {},
+        \ }
+endfunction"}}}
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
 
 " vim: foldmethod=marker

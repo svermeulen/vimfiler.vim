@@ -1,7 +1,6 @@
 "=============================================================================
 " FILE: exrename.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 24 Dec 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -32,7 +31,7 @@ function! vimfiler#exrename#create_buffer(files) "{{{
   call vimfiler#redraw_screen()
   let prefix = vimfiler#util#is_windows() ?
         \ '[exrename] - ' : '*exrename* - '
-  edit `=prefix . b:vimfiler.context.buffer_name`
+  execute 'edit' fnameescape(prefix . b:vimfiler.context.buffer_name)
 
   setlocal buftype=acwrite
   setlocal noswapfile
