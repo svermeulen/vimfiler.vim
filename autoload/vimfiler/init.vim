@@ -69,7 +69,8 @@ let g:vimfiler_expand_jump_to_first_child =
       \ get(g:, 'vimfiler_expand_jump_to_first_child', 1)
 let g:vimfiler_restore_alternate_file =
       \ get(g:, 'vimfiler_restore_alternate_file', 1)
-
+let g:vimfiler_confirm_on_move =
+      \ get(g:, 'vimfiler_confirm_on_move', 1)
 let g:vimfiler_execute_file_list =
       \ get(g:, 'vimfiler_execute_file_list', {})
 

@@ -42,6 +42,8 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
         \ :<C-u>call vimfiler#force_redraw_screen(1)<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_toggle_mark_current_line)
         \ :<C-u>call <SID>toggle_mark_current_line('j')<CR>
+  nnoremap <buffer><silent> <Plug>(vimfiler_toggle_mark_current_nomove)
+        \ :<C-u>call <SID>toggle_mark_current_line()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_toggle_mark_current_line_up)
         \ :<C-u>call <SID>toggle_mark_current_line('k')<CR>
   vnoremap <buffer><silent> <Plug>(vimfiler_toggle_mark_selected_lines)
