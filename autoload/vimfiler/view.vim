@@ -219,7 +219,7 @@ function! s:redraw_prompt() "{{{
         \ '' : '[' . (b:vimfiler.is_visible_ignore_files ? '.:' : '')
         \       . b:vimfiler.current_mask . ']'
 
-  let sort = (b:vimfiler.local_sort_type ==# g:vimfiler_sort_type) ?
+  let sort = (b:vimfiler.local_sort_type ==# b:vimfiler.global_sort_type) ?
         \ '' : ' <' . b:vimfiler.local_sort_type . '>'
 
   let safe = (b:vimfiler.is_safe_mode) ? ' *safe*' : ''
@@ -234,7 +234,7 @@ function! s:redraw_prompt() "{{{
     endif
   endif
 
-  if vimfiler#util#wcswidth(prefix.dir) > winwidth(0)
+  if strwidth(prefix.dir) > winwidth(0)
     let dir = fnamemodify(substitute(dir, '/$', '', ''), ':t')
   endif
 
@@ -252,7 +252,8 @@ function! s:redraw_prompt() "{{{
   setlocal noreadonly
 
   try
-    if getline(b:vimfiler.prompt_linenr) != '..'
+    if (context.parent || empty(b:vimfiler.current_files))
+          \ && getline(b:vimfiler.prompt_linenr) != '..'
       if line('$') == 1
         " Note: Dirty Hack for open file.
         call append(1, '')
@@ -263,17 +264,12 @@ function! s:redraw_prompt() "{{{
       endif
     endif
 
-    if context.status || context.explorer
+    if context.status
       if getline(1) == '..'
         call append(0, '[in]: ' . b:vimfiler.status)
       else
         call setline(1, '[in]: ' . b:vimfiler.status)
       endif
-    endif
-
-    if context.explorer
-      " Delete prompt
-      silent 1,2delete _
     endif
   finally
     let &l:modifiable = modifiable_save
@@ -293,19 +289,14 @@ function! vimfiler#view#_get_print_lines(files) "{{{
   " Column region.
   let start = max_len + 1
   let syntaxes = [
-            \ [vimfiler#util#wcswidth(
-            \  g:vimfiler_tree_opened_icon), 'vimfilerOpenedFile'],
-            \ [vimfiler#util#wcswidth(
-            \  g:vimfiler_tree_closed_icon), 'vimfilerClosedFile'],
-            \ [vimfiler#util#wcswidth(
-            \  g:vimfiler_readonly_file_icon), 'vimfilerROFile'],
-            \ [vimfiler#util#wcswidth(
-            \  g:vimfiler_file_icon), 'vimfilerNormalFile']]
+            \ [strwidth(g:vimfiler_tree_opened_icon), 'vimfilerOpenedFile'],
+            \ [strwidth(g:vimfiler_tree_closed_icon), 'vimfilerClosedFile'],
+            \ [strwidth(g:vimfiler_readonly_file_icon), 'vimfilerROFile'],
+            \ [strwidth(g:vimfiler_file_icon), 'vimfilerNormalFile']]
   if empty(filter(copy(syntaxes), 'v:val[0] != '.
-        \ vimfiler#util#wcswidth(g:vimfiler_file_icon)))
+        \ strwidth(g:vimfiler_file_icon)))
     " Optimize if columns are same.
-    let syntaxes = [[vimfiler#util#wcswidth(
-            \  g:vimfiler_file_icon),
+    let syntaxes = [[strwidth(g:vimfiler_file_icon),
             \  'vimfilerNormalFile,vimfilerOpenedFile,'.
             \  'vimfilerClosedFile,vimfilerROFile']]
   endif
@@ -359,7 +350,7 @@ function! vimfiler#view#_get_print_lines(files) "{{{
       let line = vimfiler#util#truncate_smart(
             \ line, max_len, max_len/2, '..')
     else
-      let line .= repeat(' ', max_len - vimfiler#util#wcswidth(line))
+      let line .= repeat(' ', max_len - strwidth(line))
     endif
 
     for column in columns
@@ -407,7 +398,7 @@ function! vimfiler#view#_get_max_len(files) "{{{
     silent execute 'sign unplace buffer='.bufnr('%')
   endif
 
-  return max([max([winwidth(0), &winwidth]) - padding, 10])
+  return max([winwidth(0) - padding, 10])
 endfunction"}}}
 function! vimfiler#view#_define_syntax() "{{{
   for column in filter(

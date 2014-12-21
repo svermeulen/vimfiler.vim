@@ -32,7 +32,7 @@ let g:vimfiler_detect_drives =
       \     'H:/', 'I:/', 'J:/', 'K:/', 'L:/', 'M:/', 'N:/',
       \     'O:/', 'P:/', 'Q:/', 'R:/', 'S:/', 'T:/', 'U:/',
       \     'V:/', 'W:/', 'X:/', 'Y:/', 'Z:/'
-      \ ] : [])
+      \ ] : [expand('~'), expand('~/Downloads/')])
 
 function! unite#sources#vimfiler_drive#define() "{{{
   return s:source
@@ -54,6 +54,7 @@ function! s:source.gather_candidates(args, context) "{{{
     elseif !unite#util#is_windows()
       let s:drives += split(glob('/mnt/*'), '\n')
             \ + split(glob('/media/*'), '\n')
+            \ + split(glob('/media/' . $USER . '/*'), '\n')
     endif
     call filter(s:drives, 'isdirectory(v:val)')
 

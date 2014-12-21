@@ -31,7 +31,7 @@ endif
 try
   let s:exists_unite_version = unite#version()
 catch
-  echomsg 'Error occured while loading unite.vim.'
+  echomsg 'Error occurred while loading unite.vim.'
   echomsg 'Please install unite.vim Ver.3.0 or above.'
   finish
 endtry
@@ -68,6 +68,10 @@ function! vimfiler#do_action(action) "{{{
   return printf(":\<C-u>call vimfiler#mappings#do_action(%s)\<CR>",
         \             string(a:action))
 endfunction"}}}
+function! vimfiler#do_switch_action(action) "{{{
+  return printf(":\<C-u>call vimfiler#mappings#do_switch_action(%s)\<CR>",
+        \             string(a:action))
+endfunction"}}}
 function! vimfiler#smart_cursor_map(directory_map, file_map) "{{{
   return vimfiler#mappings#smart_cursor_map(a:directory_map, a:file_map)
 endfunction"}}}
@@ -82,6 +86,7 @@ function! vimfiler#get_current_vimfiler() "{{{
 endfunction"}}}
 function! vimfiler#set_current_vimfiler(vimfiler) "{{{
   let s:current_vimfiler = a:vimfiler
+  call unite#set_current_unite(a:vimfiler.unite)
 endfunction"}}}
 function! vimfiler#get_context() "{{{
   return vimfiler#get_current_vimfiler().context
@@ -171,7 +176,8 @@ function! vimfiler#exists_another_vimfiler() "{{{
         \ && bufloaded(b:vimfiler.another_vimfiler_bufnr) > 0
 endfunction"}}}
 function! vimfiler#winnr_another_vimfiler() "{{{
-  return winnr() == bufwinnr(b:vimfiler.another_vimfiler_bufnr) ?
+  return (!exists('b:vimfiler')
+        \ || winnr() == bufwinnr(b:vimfiler.another_vimfiler_bufnr)) ?
         \ -1 : bufwinnr(b:vimfiler.another_vimfiler_bufnr)
 endfunction"}}}
 function! vimfiler#get_another_vimfiler() "{{{
