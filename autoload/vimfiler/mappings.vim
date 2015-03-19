@@ -40,6 +40,8 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
         \ (line('.') == 1)? ":call \<SID>cursor_bottom()\<CR>" : 'k'
   nnoremap <buffer><silent> <Plug>(vimfiler_redraw_screen)
         \ :<C-u>call vimfiler#force_redraw_screen(1)<CR>
+  nnoremap <buffer><silent> <Plug>(vimfiler_toggle_mark_current_line_no_move)
+        \ :<C-u>call <SID>toggle_mark_current_line('')<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_toggle_mark_current_line)
         \ :<C-u>call <SID>toggle_mark_current_line('j')<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_toggle_mark_current_line_up)
