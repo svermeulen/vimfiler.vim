@@ -359,7 +359,8 @@ function! vimfiler#init#_start(path, ...) "{{{
   endif
 
   let context = vimfiler#initialize_context(get(a:000, 0, {}))
-  if &l:modified && !&l:hidden
+  if (!&l:hidden && &l:modified)
+        \ || (&l:hidden && &l:bufhidden =~# 'unload\|delete\|wipe')
     " Split automatically.
     let context.split = 1
   endif
@@ -378,7 +379,7 @@ function! vimfiler#init#_start(path, ...) "{{{
     " Search vimfiler buffer.
     for bufnr in filter(insert(range(1, bufnr('$')), bufnr('%')),
           \ "bufloaded(v:val) &&
-          \ getbufvar(v:val, '&filetype') ==# 'vimfiler'")
+          \ getbufvar(v:val, '&filetype') =~# 'vimfiler'")
       let vimfiler = getbufvar(bufnr, 'vimfiler')
       if type(vimfiler) == type({})
             \ && vimfiler.context.buffer_name ==# context.buffer_name
@@ -483,7 +484,8 @@ function! s:create_vimfiler_buffer(path, context) "{{{
     let path = vimfiler#util#path2project_directory(path)
   endif
 
-  if &l:modified && !&l:hidden
+  if (!&l:hidden && &l:modified)
+        \ || (&l:hidden && &l:bufhidden =~# 'unload\|delete\|wipe')
     " Split automatically.
     let context.split = 1
   endif
@@ -556,7 +558,7 @@ function! vimfiler#init#_default_settings() "{{{
           \ call vimfiler#handler#_event_cursor_moved()
     autocmd FocusGained <buffer>
           \ call vimfiler#view#_force_redraw_all_vimfiler()
-    autocmd WinEnter,VimResized <buffer>
+    autocmd WinEnter,VimResized,CursorHold <buffer>
           \ call vimfiler#view#_redraw_all_vimfiler()
   augroup end"}}}
 endfunction"}}}

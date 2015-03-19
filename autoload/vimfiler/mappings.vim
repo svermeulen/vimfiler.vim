@@ -64,8 +64,6 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
         \ vimfiler#mappings#smart_cursor_map(
         \  "\<Plug>(vimfiler_expand_tree)",
         \  "\<Plug>(vimfiler_edit_file)")
-  nmap <buffer> <Plug>(vimfiler_execute_file)
-        \ <Plug>(vimfiler_execute_system_associated)
   nnoremap <buffer><silent> <Plug>(vimfiler_execute_system_associated)
         \ :<C-u>call <SID>execute_system_associated()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_execute_vimfiler_associated)
@@ -1235,7 +1233,7 @@ function! s:execute_shell_command() "{{{
   let command = input('Input shell command: ', '', 'shellcmd')
   redraw
   if command == ''
-    echo 'Canceled.'
+    echo 'Cancelled.'
     return
   endif
 
@@ -1709,7 +1707,7 @@ function! s:cd_input_directory() "{{{
         \ 'customlist,vimfiler#complete_path')
 
   if dir == ''
-    echo 'Canceled.'
+    echo 'Cancelled.'
     return
   endif
 
