@@ -243,12 +243,20 @@ function! vimfiler#helper#_get_buffer_directory(bufnr) "{{{
   return dir
 endfunction"}}}
 
-function! vimfiler#helper#_set_cursor()
+function! vimfiler#helper#_set_cursor() "{{{
   let pos = getpos('.')
   execute 'normal!' (line('.') <= winheight(0) ? 'zb' :
         \ line('$') - line('.') > winheight(0) ? 'zz' : line('$').'zb')
   call setpos('.', pos)
-endfunction
+endfunction"}}}
+
+function! vimfiler#helper#_call_filters(files, context) "{{{
+  let files = a:files
+  for filter in b:vimfiler.filters
+    let files = filter.filter(files, a:context)
+  endfor
+  return files
+endfunction"}}}
 
 function! s:sort(files, type) "{{{
   let ignorecase_save = &ignorecase
@@ -289,7 +297,8 @@ function! s:sort(files, type) "{{{
 endfunction"}}}
 
 function! vimfiler#helper#_sort_human(candidates, has_lua) "{{{
-  if !a:has_lua
+  if !a:has_lua || len(filter(copy(a:candidates),
+        \ "v:val.vimfiler__filename =~ '\\d'")) >= 2
     return sort(a:candidates, 's:compare_filename')
   endif
 
@@ -320,10 +329,8 @@ endfunction"}}}
 
 " Compare filename by human order. "{{{
 function! s:compare_filename(i1, i2)
-  let words_1 = map(split(a:i1.vimfiler__filename, '\D\zs\ze\d\+'),
-        \ "v:val =~ '^\\d\\+$' ? str2nr(v:val) : v:val")
-  let words_2 = map(split(a:i2.vimfiler__filename, '\D\zs\ze\d\+'),
-        \ "v:val =~ '^\\d\\+$' ? str2nr(v:val) : v:val")
+  let words_1 = s:get_words(a:i1.vimfiler__filename)
+  let words_2 = s:get_words(a:i2.vimfiler__filename)
   let words_1_len = len(words_1)
   let words_2_len = len(words_2)
 
@@ -336,6 +343,15 @@ function! s:compare_filename(i1, i2)
   endfor
 
   return words_1_len - words_2_len
+endfunction"}}}
+
+function! s:get_words(filename) abort "{{{
+  let words = []
+  for split in split(a:filename, '\d\+\zs\ze')
+    let words += split(split, '\D\zs\ze\d\+')
+  endfor
+
+  return map(words, "v:val =~ '^\\d\\+$' ? str2nr(v:val) : v:val")
 endfunction"}}}
 
 let &cpo = s:save_cpo

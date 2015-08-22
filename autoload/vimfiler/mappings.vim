@@ -152,14 +152,15 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
         \ :<C-u>call <SID>pushd()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_popd)
         \ :<C-u>call <SID>popd()<CR>
+
+  nmap <buffer><silent><expr> <Plug>(vimfiler_smart_h)
+        \ (<SID>check_opened() ?
+        \ "\<Plug>(vimfiler_unexpand_tree)" :
+        \ "\<Plug>(vimfiler_switch_to_parent_directory)")
   if a:context.explorer
-    nnoremap <buffer><silent><expr> <Plug>(vimfiler_smart_h)
-          \ ":\<C-u>call \<SID>unexpand_tree()\<CR>"
     nmap <buffer><silent> <Plug>(vimfiler_smart_l)
           \ <Plug>(vimfiler_expand_or_edit)
   else
-    nmap <buffer><silent> <Plug>(vimfiler_smart_h)
-          \ <Plug>(vimfiler_switch_to_parent_directory)
     nmap <buffer><silent> <Plug>(vimfiler_smart_l)
           \ <Plug>(vimfiler_cd_or_edit)
   endif
@@ -169,6 +170,8 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
         \ :<C-u>call <SID>cursor_bottom()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_expand_tree)
         \ :<C-u>call <SID>toggle_tree(0)<CR>
+  nnoremap <buffer><silent> <Plug>(vimfiler_unexpand_tree)
+        \ :<C-u>call <SID>unexpand_tree()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_expand_tree_recursive)
         \ :<C-u>call <SID>toggle_tree(1)<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_cd_input_directory)
@@ -412,10 +415,11 @@ function! vimfiler#mappings#do_switch_action(action) "{{{
   call s:switch()
 
   let context = vimfiler#get_context()
-  if context.quit && buflisted(context.alternate_buffer)
+  if !context.force_quit
+        \ && context.quit && buflisted(context.alternate_buffer)
         \ && getbufvar(context.alternate_buffer, '&filetype') !=# 'vimfiler'
         \ && g:vimfiler_restore_alternate_file
-    execute 'buffer' context.alternate_buffer
+    silent! execute 'buffer' context.alternate_buffer
   endif
 
   call vimfiler#mappings#do_action(a:action, current_linenr)
@@ -963,8 +967,8 @@ function! s:expand_tree(is_recursive) "{{{
   endif
 
   if !a:is_recursive && !b:vimfiler.is_visible_ignore_files
-    call filter(files, 'v:val.vimfiler__filename !~ '''
-          \   . g:vimfiler_ignore_pattern . '''')
+    let files = vimfiler#helper#_call_filters(
+          \ files, vimfiler#get_context())
   endif
 
   let index = vimfiler#get_file_index(line('.'))
@@ -1218,7 +1222,7 @@ function! s:edit_binary_file() "{{{
 
   if !exists(':Vinarise')
     call vimfiler#util#print_error(
-          \ '[vimfiler] vinarise is not found. Please install it.')
+          \ 'vinarise is not found. Please install it.')
     return
   endif
 
@@ -1265,6 +1269,10 @@ function! s:execute_shell_command() "{{{
         \})
 endfunction"}}}
 function! s:exit(vimfiler) "{{{
+  if !bufexists(a:vimfiler.bufnr)
+    return
+  endif
+
   let another_bufnr = a:vimfiler.another_vimfiler_bufnr
   call vimfiler#util#delete_buffer(a:vimfiler.bufnr)
 
@@ -1445,6 +1453,8 @@ function! s:split_edit_file() "{{{
   " Resize.
   execute 'vertical resize'
         \ (winnr('$') == 1 ? winwidth : winwidth/(winnr('$') - 1))
+  setlocal nowinfixwidth
+  setlocal nowinfixheight
 endfunction"}}}
 
 " File operations.
@@ -1578,7 +1588,7 @@ endfunction"}}}
 function! s:clipboard_paste() "{{{
   let clipboard = vimfiler#variables#get_clipboard()
   if empty(clipboard.files)
-    call vimfiler#util#print_error('[vimfiler] Clipboard is empty.')
+    call vimfiler#util#print_error('Clipboard is empty.')
     return
   endif
 
@@ -1649,7 +1659,7 @@ function! vimfiler#mappings#_change_vim_current_dir() "{{{
   let vimfiler = vimfiler#get_current_vimfiler()
   if vimfiler.source !=# 'file'
     call vimfiler#util#print_error(
-          \ '[vimfiler] Invalid operation in not file source.')
+          \ 'Invalid operation in not file source.')
     return
   endif
 
@@ -1662,7 +1672,7 @@ endfunction"}}}
 function! s:grep() "{{{
   if !vimfiler#util#has_vimproc()
     call vimfiler#util#print_error(
-          \ '[vimfiler] Sorry, vimproc is not installed. '.
+          \ 'Sorry, vimproc is not installed. '.
           \ 'This mapping use vimproc.')
     return
   endif
@@ -1680,7 +1690,7 @@ endfunction"}}}
 function! s:find() "{{{
   if !vimfiler#util#has_vimproc()
     call vimfiler#util#print_error(
-          \ '[vimfiler] Sorry, vimproc is not installed. '.
+          \ 'Sorry, vimproc is not installed. '.
           \ 'This mapping use vimproc.')
     return
   endif
@@ -1733,7 +1743,7 @@ endfunction"}}}
 function! s:quick_look() "{{{
   if !vimfiler#util#has_vimproc()
     call vimfiler#util#print_error(
-          \ '[vimfiler] vimproc is needed for this feature.')
+          \ 'vimproc is needed for this feature.')
     return
   endif
 
@@ -1750,7 +1760,7 @@ function! s:quick_look() "{{{
     call vimproc#system_gui(command)
   catch /vimproc#get_command_name: /
     call vimfiler#util#print_error(
-          \ '[vimfiler] g:vimfiler_quick_look_command "'.
+          \ 'g:vimfiler_quick_look_command "'.
           \ g:vimfiler_quick_look_command.'" is not executable.')
     return
   endtry
@@ -1810,7 +1820,7 @@ function! s:unmapping_file_operations() "{{{
 endfunction"}}}
 function! s:disable_operation() "{{{
   call vimfiler#util#print_error(
-        \ '[vimfiler] In safe mode, this operation is disabled.')
+        \ 'In safe mode, this operation is disabled.')
 endfunction"}}}
 
 function! s:toggle_simple_mode() "{{{
@@ -1860,13 +1870,22 @@ function! s:get_abbr_length(parent, child) "{{{
 endfunction"}}}
 
 function! s:check_force_quit(vimfiler, action) "{{{
-  if a:vimfiler.context.force_quit
+  if (a:vimfiler.context.force_quit || a:vimfiler.context.force_hide)
         \ && index([
         \  'vimfiler__move', 'vimfiler__copy', 'vimfiler__delete',
         \  'vimfiler__rename', 'vimfiler__mkdir',
         \ ], a:action) < 0
-    call s:exit(a:vimfiler)
+    if a:vimfiler.context.force_quit
+      call s:exit(a:vimfiler)
+    else
+      call s:close()
+    endif
   endif
+endfunction"}}}
+
+function! s:check_opened() "{{{
+  return get(vimfiler#get_file(), 'vimfiler__is_opened', 0)
+        \ || get(vimfiler#get_file(), 'vimfiler__nest_level', 0) > 0
 endfunction"}}}
 
 " vim: foldmethod=marker

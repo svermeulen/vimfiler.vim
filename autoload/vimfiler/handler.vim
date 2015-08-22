@@ -52,7 +52,7 @@ function! s:on_BufReadCmd(source_name, source_args, context)  "{{{1
     if !empty(unite#loaded_sources_list()) && a:source_name !=# 'file'
       " File not found.
       call vimfiler#util#print_error(
-            \ printf('[vimfiler] Can''t open "%s".', join(a:source_args, ':')))
+            \ printf('Can''t open "%s".', join(a:source_args, ':')))
     endif
 
     doautocmd BufRead
@@ -72,7 +72,7 @@ function! s:on_BufReadCmd(source_name, source_args, context)  "{{{1
     call vimfiler#init#_vimfiler_file(
           \ a:source_args, info[0], info[1])
   else
-    call vimfiler#util#print_error('[vimfiler] Unknown filetype.')
+    call vimfiler#util#print_error('Unknown filetype.')
   endif
 
   if bufnr('%') != bufnr
@@ -102,7 +102,7 @@ function! s:on_FileReadCmd(source_name, source_args, context)  "{{{1
     if !empty(unite#loaded_sources_list()) && a:source_name !=# 'file'
       " File not found.
       call vimfiler#util#print_error(
-            \ printf('[vimfiler] Can''t open "%s".', join(a:source_args, ':')))
+            \ printf('Can''t open "%s".', join(a:source_args, ':')))
     endif
 
     return
@@ -111,7 +111,7 @@ function! s:on_FileReadCmd(source_name, source_args, context)  "{{{1
 
   if type !=# 'file'
     call vimfiler#util#print_error(
-          \ printf('[vimfiler] "%s" is not a file.', join(a:source_args, ':')))
+          \ printf('"%s" is not a file.', join(a:source_args, ':')))
     return
   endif
 
@@ -190,8 +190,6 @@ function! vimfiler#handler#_event_bufwin_enter(bufnr) "{{{
         call vimfiler#view#_redraw_screen()
       endif
     endif
-
-    call s:restore_statusline()
   finally
     if exists('winnr')
       execute winnr.'wincmd w'
@@ -216,6 +214,10 @@ function! vimfiler#handler#_event_bufwin_leave(bufnr) "{{{
 endfunction"}}}
 
 function! vimfiler#handler#_event_cursor_moved() "{{{
+  if !exists('b:vimfiler')
+    return
+  endif
+
   if line('.') <= line('$') / 2 ||
         \ b:vimfiler.all_files_len == len(b:vimfiler.current_files)
     return
@@ -233,17 +235,6 @@ function! vimfiler#handler#_event_cursor_moved() "{{{
   finally
     setlocal nomodifiable
   endtry
-endfunction"}}}
-
-function! s:restore_statusline()  "{{{
-  if &filetype !=# 'vimfiler' || !g:vimfiler_force_overwrite_statusline
-    return
-  endif
-
-  if &l:statusline != b:vimfiler.statusline
-    " Restore statusline.
-    let &l:statusline = b:vimfiler.statusline
-  endif
 endfunction"}}}
 
 let &cpo = s:save_cpo
