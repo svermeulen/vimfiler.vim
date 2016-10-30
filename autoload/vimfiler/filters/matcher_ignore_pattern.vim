@@ -26,7 +26,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! vimfiler#filters#matcher_ignore_pattern#define()
+function! vimfiler#filters#matcher_ignore_pattern#define() abort
   return s:filter
 endfunction"}}}
 
@@ -35,9 +35,9 @@ let s:filter = {
       \ 'description' : 'ignore g:vimfiler_ignore_pattern matched files',
       \ }
 
-function! s:filter.filter(files, context) "{{{
-  for pattern in vimfiler#util#convert2list(
-        \ g:vimfiler_ignore_pattern)
+function! s:filter.filter(files, context) abort "{{{
+  for pattern in filter(vimfiler#util#convert2list(
+        \ g:vimfiler_ignore_pattern), "v:val != ''")
     call filter(a:files,
           \  "v:val.vimfiler__filename !~? pattern")
   endfor

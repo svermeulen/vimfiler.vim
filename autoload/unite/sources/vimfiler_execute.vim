@@ -26,7 +26,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#sources#vimfiler_execute#define() "{{{
+function! unite#sources#vimfiler_execute#define() abort "{{{
   return s:source
 endfunction"}}}
 
@@ -37,25 +37,25 @@ let s:source = {
       \ 'is_listed' : 0,
       \ }
 
-function! s:source.hooks.on_init(args, context) "{{{
+function! s:source.hooks.on_init(args, context) abort "{{{
   let winnr = winnr()
   try
-    execute a:context.vimfiler__winnr.'wincmd w'
+    call vimfiler#util#winmove(a:context.vimfiler__winnr)
 
     if &filetype !=# 'vimfiler'
       return []
     endif
 
-    let a:context.source__file = vimfiler#get_file(line('.'))
+    let a:context.source__file = vimfiler#get_file(b:vimfiler, line('.'))
   finally
-    execute winnr.'wincmd w'
+    call vimfiler#util#winmove(winnr)
   endtry
   if &filetype !=# 'vimfiler'
     return
   endif
 endfunction"}}}
 
-function! s:source.gather_candidates(args, context) "{{{
+function! s:source.gather_candidates(args, context) abort "{{{
   if !has_key(a:context, 'source__file')
     return []
   endif

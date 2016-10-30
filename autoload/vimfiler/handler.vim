@@ -77,10 +77,8 @@ function! s:on_BufReadCmd(source_name, source_args, context)  "{{{1
 
   if bufnr('%') != bufnr
     " Restore window.
-    execute bufwinnr(bufnr).'wincmd w'
+    call vimfiler#util#winmove(bufwinnr(bufnr))
   endif
-
-  call vimfiler#set_current_vimfiler(b:vimfiler)
 endfunction"}}}
 
 function! s:on_BufWriteCmd(source_name, source_args, context)  "{{{1
@@ -119,13 +117,13 @@ function! s:on_FileReadCmd(source_name, source_args, context)  "{{{1
 endfunction"}}}
 
 
-function! s:on_FileWriteCmd(source_name, source_args, context)  "{{{
+function! s:on_FileWriteCmd(source_name, source_args, context) abort  "{{{
   " FileWriteCmd is published by :write or other commands with partial range
   " such as 1,2 where 2 < line('$').
   return s:write(a:source_name, a:source_args, line("'["), line("']"), 'FileWriteCmd')
 endfunction"}}}
 
-function! s:write(source_name, source_args, line1, line2, event_name)  "{{{
+function! s:write(source_name, source_args, line1, line2, event_name) abort  "{{{
   if !exists('b:vimfiler') || !has_key(b:vimfiler, 'current_file') || !&l:modified
     return
   endif
@@ -146,10 +144,10 @@ function! s:write(source_name, source_args, line1, line2, event_name)  "{{{
 endfunction"}}}
 
 " Event functions.
-function! vimfiler#handler#_event_bufwin_enter(bufnr) "{{{
+function! vimfiler#handler#_event_bufwin_enter(bufnr) abort "{{{
   if a:bufnr != bufnr('%') && bufwinnr(a:bufnr) > 0
     let winnr = winnr()
-    execute bufwinnr(a:bufnr) 'wincmd w'
+    call vimfiler#util#winmove(bufwinnr(a:bufnr))
   endif
 
   try
@@ -159,12 +157,12 @@ function! vimfiler#handler#_event_bufwin_enter(bufnr) "{{{
       return
     endif
 
-    let vimfiler = vimfiler#get_current_vimfiler()
+    let vimfiler = b:vimfiler
     if !has_key(vimfiler, 'context')
       return
     endif
 
-    let context = vimfiler#get_context()
+    let context = b:vimfiler.context
     if context.winwidth > 0
       execute 'vertical resize' context.winwidth
 
@@ -192,12 +190,12 @@ function! vimfiler#handler#_event_bufwin_enter(bufnr) "{{{
     endif
   finally
     if exists('winnr')
-      execute winnr.'wincmd w'
+      call vimfiler#util#winmove(winnr)
     endif
   endtry
 endfunction"}}}
 
-function! vimfiler#handler#_event_bufwin_leave(bufnr) "{{{
+function! vimfiler#handler#_event_bufwin_leave(bufnr) abort "{{{
   let vimfiler = getbufvar(str2nr(a:bufnr), 'vimfiler')
 
   if type(vimfiler) != type({})
@@ -213,7 +211,7 @@ function! vimfiler#handler#_event_bufwin_leave(bufnr) "{{{
   endif
 endfunction"}}}
 
-function! vimfiler#handler#_event_cursor_moved() "{{{
+function! vimfiler#handler#_event_cursor_moved() abort "{{{
   if !exists('b:vimfiler')
     return
   endif

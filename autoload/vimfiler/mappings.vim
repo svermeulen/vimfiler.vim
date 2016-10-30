@@ -25,17 +25,17 @@
 
 scriptencoding utf-8
 
-let s:Cache = vimfiler#util#get_vital().import('System.Cache')
+let s:Cache = vimfiler#util#get_vital_cache()
 
-function! s:SID_PREFIX()
+function! s:SID_PREFIX() abort
   return matchstr(expand('<sfile>'), '<SNR>\d\+_\zeSID_PREFIX$')
 endfunction
 
-function! vimfiler#mappings#define_default_mappings(context) "{{{
+function! vimfiler#mappings#define_default_mappings(context) abort "{{{
   " Plugin keymappings "{{{
   nnoremap <buffer><expr> <Plug>(vimfiler_loop_cursor_down)
         \ (line('.') == line('$'))?
-        \  (vimfiler#get_file_offset()+1).'Gzb' : 'j'
+        \  (vimfiler#get_file_offset(b:vimfiler)+1).'Gzb' : 'j'
   nnoremap <buffer><silent><expr> <Plug>(vimfiler_loop_cursor_up)
         \ (line('.') == 1)? ":call \<SID>cursor_bottom()\<CR>" : 'k'
   nnoremap <buffer><silent> <Plug>(vimfiler_redraw_screen)
@@ -53,7 +53,7 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
   nnoremap <buffer><silent> <Plug>(vimfiler_mark_similar_lines)
         \ :<C-u>call <SID>mark_similar_lines()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_clear_mark_all_lines)
-        \ :<C-u>call <SID>clear_mark_all_lines()<CR>
+        \ :<C-u>call <SID>clear_mark_all_lines(b:vimfiler)<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_mark_current_line)
         \ :<C-u>call <SID>mark_current_line()<CR>
   nmap <buffer><silent><expr> <Plug>(vimfiler_cd_or_edit)
@@ -88,7 +88,7 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
         \ :<C-u>call <SID>popup_shell()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_edit_file)
         \ :<C-u>call vimfiler#mappings#do_switch_action(
-        \   b:vimfiler.context.edit_action)<CR>
+        \   b:vimfiler, b:vimfiler.context.edit_action)<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_split_edit_file)
         \ :<C-u>call <SID>split_edit_file()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_edit_binary_file)
@@ -102,12 +102,12 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
   nnoremap <buffer><silent> <Plug>(vimfiler_exit)
         \ :<C-u>call <SID>exit(b:vimfiler)<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_close)
-        \ :<C-u>call <SID>close()<CR>
+        \ :<C-u>call <SID>close(b:vimfiler)<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_help)
         \ :<C-u>call <SID>help()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_preview_file)
         \ :<C-u>call vimfiler#mappings#do_action(
-        \  b:vimfiler.context.preview_action)<CR>
+        \  b:vimfiler, b:vimfiler.context.preview_action)<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_sync_with_current_vimfiler)
         \ :<C-u>call <SID>sync_with_current_vimfiler()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_sync_with_another_vimfiler)
@@ -165,7 +165,7 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
           \ <Plug>(vimfiler_cd_or_edit)
   endif
   nnoremap <buffer><silent><expr> <Plug>(vimfiler_cursor_top)
-        \ (vimfiler#get_file_offset()+1).'Gzb'
+        \ (vimfiler#get_file_offset(b:vimfiler)+1).'Gzb'
   nnoremap <buffer><silent> <Plug>(vimfiler_cursor_bottom)
         \ :<C-u>call <SID>cursor_bottom()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_expand_tree)
@@ -273,6 +273,8 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
 
   execute s:nowait_nmap() 'x'
         \ '<Plug>(vimfiler_execute_system_associated)'
+  execute s:nowait_nmap() 'X'
+        \ '<Plug>(vimfiler_execute_vimfiler_associated)'
 
   " Move to directory.
   execute s:nowait_nmap() 'h'
@@ -381,25 +383,25 @@ function! vimfiler#mappings#define_default_mappings(context) "{{{
         \ '<Plug>(vimfiler_jump_first_child)'
 endfunction"}}}
 
-function! s:nowait_nmap() "{{{
+function! s:nowait_nmap() abort "{{{
   return 'nmap <buffer>'
         \ . ((v:version > 703 || (v:version == 703 && has('patch1261'))) ?
         \ '<nowait>' : '')
 endfunction "}}}
 
-function! vimfiler#mappings#smart_cursor_map(directory_map, file_map) "{{{
+function! vimfiler#mappings#smart_cursor_map(directory_map, file_map) abort "{{{
   let filename = vimfiler#get_filename()
-  let file = vimfiler#get_file()
+  let file = vimfiler#get_file(b:vimfiler)
   return  filename == '..' || empty(file)
         \ || file.vimfiler__is_directory ?
         \ a:directory_map : a:file_map
 endfunction"}}}
 
-function! vimfiler#mappings#do_action(action, ...) "{{{
+function! vimfiler#mappings#do_action(vimfiler, action, ...) abort "{{{
   let cursor_linenr = get(a:000, 0, line('.'))
-  let marked_files = vimfiler#get_marked_files()
+  let marked_files = vimfiler#get_marked_files(a:vimfiler)
   if empty(marked_files)
-    let file = vimfiler#get_file(cursor_linenr)
+    let file = vimfiler#get_file(a:vimfiler, cursor_linenr)
     if empty(file)
       return
     endif
@@ -407,14 +409,15 @@ function! vimfiler#mappings#do_action(action, ...) "{{{
     let marked_files = [ file ]
   endif
 
-  return vimfiler#mappings#do_files_action(a:action, marked_files)
+  return vimfiler#mappings#do_files_action(
+        \ a:vimfiler, a:action, marked_files)
 endfunction"}}}
 
-function! vimfiler#mappings#do_switch_action(action) "{{{
+function! vimfiler#mappings#do_switch_action(vimfiler, action) abort "{{{
   let current_linenr = line('.')
   call s:switch()
 
-  let context = vimfiler#get_context()
+  let context = a:vimfiler.context
   if !context.force_quit
         \ && context.quit && buflisted(context.alternate_buffer)
         \ && getbufvar(context.alternate_buffer, '&filetype') !=# 'vimfiler'
@@ -422,46 +425,41 @@ function! vimfiler#mappings#do_switch_action(action) "{{{
     silent! execute 'buffer' context.alternate_buffer
   endif
 
-  call vimfiler#mappings#do_action(a:action, current_linenr)
+  call vimfiler#mappings#do_action(a:vimfiler, a:action, current_linenr)
 endfunction"}}}
 
-function! vimfiler#mappings#do_files_action(action, files, ...) "{{{
-  let vimfiler = vimfiler#get_current_vimfiler()
-
+function! vimfiler#mappings#do_files_action(vimfiler, action, files, ...) abort "{{{
   let context = get(a:000, 0, {})
   if !has_key(context, 'vimfiler__current_directory')
-    let context.vimfiler__current_directory = vimfiler.current_dir
+    let context.vimfiler__current_directory = a:vimfiler.current_dir
   endif
   let context.unite__is_interactive = 1
 
-  call s:clear_mark_all_lines()
+  call s:clear_mark_all_lines(a:vimfiler)
 
-  call s:check_force_quit(vimfiler, a:action)
+  call s:check_force_quit(a:vimfiler, a:action)
 
   " Execute action.
   call unite#mappings#do_action(a:action, a:files, context)
 endfunction"}}}
 
-function! vimfiler#mappings#do_current_dir_action(action, ...) "{{{
+function! vimfiler#mappings#do_current_dir_action(vimfiler, action, ...) abort "{{{
   let context = get(a:000, 0, {})
-  let vimfiler = vimfiler#get_current_vimfiler()
-
-  return vimfiler#mappings#do_dir_action(a:action, vimfiler.current_dir, context)
+  return vimfiler#mappings#do_dir_action(
+        \ a:vimfiler, a:action, a:vimfiler.current_dir, context)
 endfunction"}}}
 
-function! vimfiler#mappings#do_dir_action(action, directory, ...) "{{{
-  let vimfiler = vimfiler#get_current_vimfiler()
-
+function! vimfiler#mappings#do_dir_action(vimfiler, action, directory, ...) abort "{{{
   let context = get(a:000, 0, {})
   let context.vimfiler__current_directory = a:directory
   let context.unite__is_interactive = 1
 
-  let files = vimfiler#get_marked_files()
+  let files = vimfiler#get_marked_files(a:vimfiler)
   if empty(files)
     let context.vimfiler__is_dummy = 1
 
     let files = unite#get_vimfiler_candidates(
-          \ [[vimfiler.source, a:directory]], context)
+          \ [[a:vimfiler.source, a:directory]], context)
     if empty(files)
       return
     endif
@@ -469,23 +467,23 @@ function! vimfiler#mappings#do_dir_action(action, directory, ...) "{{{
     let context.vimfiler__is_dummy = 0
   endif
 
-  call s:clear_mark_all_lines()
+  call s:clear_mark_all_lines(a:vimfiler)
 
-  call s:check_force_quit(vimfiler, a:action)
+  call s:check_force_quit(a:vimfiler, a:action)
 
   " Execute action.
   call unite#mappings#do_action(a:action, files, context)
 endfunction"}}}
 
-function! vimfiler#mappings#cd_project(...) "{{{
+function! vimfiler#mappings#cd_project(...) abort "{{{
   let path = get(a:000, 0,
         \ vimfiler#util#path2project_directory(
-        \   vimfiler#get_context().path)
+        \   b:vimfiler.context.path)
         \ )
   call vimfiler#mappings#cd(path)
 endfunction"}}}
 
-function! vimfiler#mappings#cd(dir, ...) "{{{
+function! vimfiler#mappings#cd(dir, ...) abort "{{{
   if &filetype !=# 'vimfiler'
     return
   endif
@@ -507,7 +505,7 @@ function! vimfiler#mappings#cd(dir, ...) "{{{
   let fullpath = vimfiler#helper#_get_cd_path(a:dir)
   let b:vimfiler.current_dir = fullpath
 
-  if vimfiler#get_context().auto_cd
+  if b:vimfiler.context.auto_cd
     call vimfiler#mappings#_change_vim_current_dir()
   endif
 
@@ -547,7 +545,7 @@ function! vimfiler#mappings#cd(dir, ...) "{{{
   call s:restore_cursor(a:dir, fullpath, save_pos,
         \ previous_current_dir)
 endfunction"}}}
-function! s:restore_cursor(dir, fullpath, save_pos, previous_current_dir) "{{{
+function! s:restore_cursor(dir, fullpath, save_pos, previous_current_dir) abort "{{{
   " Restore cursor pos.
   if a:dir ==# '..'
     " Search previous current directory.
@@ -559,7 +557,7 @@ function! s:restore_cursor(dir, fullpath, save_pos, previous_current_dir) "{{{
       if path ==#
             \ b:vimfiler.source.':'.a:previous_current_dir
             \ || path ==# a:previous_current_dir
-        call cursor(vimfiler#get_line_number(num), 1)
+        call cursor(vimfiler#get_line_number(b:vimfiler, num), 1)
         break
       endif
 
@@ -568,24 +566,24 @@ function! s:restore_cursor(dir, fullpath, save_pos, previous_current_dir) "{{{
   elseif has_key(b:vimfiler.directory_cursor_pos, a:fullpath)
     call setpos('.', b:vimfiler.directory_cursor_pos[a:fullpath])
   else
-    call cursor(vimfiler#get_file_offset()+1, 0)
+    call cursor(vimfiler#get_file_offset(b:vimfiler)+1, 0)
   endif
 
   call vimfiler#helper#_set_cursor()
 endfunction"}}}
 
-function! s:cursor_bottom() "{{{
+function! s:cursor_bottom() abort "{{{
   if b:vimfiler.all_files_len != len(b:vimfiler.current_files)
     call vimfiler#view#_redraw_screen(1)
   endif
   call cursor(line('$'), 0)
 endfunction"}}}
 
-function! vimfiler#mappings#search_cursor(path) "{{{
+function! vimfiler#mappings#search_cursor(path) abort "{{{
   let max = line('$')
   let cnt = 1
   while cnt <= max
-    let file = vimfiler#get_file(cnt)
+    let file = vimfiler#get_file(b:vimfiler, cnt)
     if empty(file)
       let cnt += 1
       continue
@@ -610,37 +608,37 @@ function! vimfiler#mappings#search_cursor(path) "{{{
   endwhile
 endfunction"}}}
 
-function! vimfiler#mappings#close(buffer_name) "{{{
+function! vimfiler#mappings#close(buffer_name) abort "{{{
   let quit_winnr = vimfiler#util#get_vimfiler_winnr(a:buffer_name)
   if quit_winnr > 0
     " Hide unite buffer.
-    silent execute quit_winnr 'wincmd w'
+    call vimfiler#util#winmove(quit_winnr)
 
     if winnr('$') != 1
       close
     else
-      call vimfiler#util#alternate_buffer()
+      call vimfiler#util#alternate_buffer(
+            \ getbufvar(winbufnr(quit_winnr), 'vimfiler').context)
     endif
   endif
 
   return quit_winnr > 0
 endfunction"}}}
 
-function! s:switch() "{{{
-  let context = vimfiler#get_context()
+function! s:switch() abort "{{{
+  let context = b:vimfiler.context
   if context.quit
     return
   endif
 
-  let vimfiler = vimfiler#get_current_vimfiler()
-
-  call vimfiler#set_current_vimfiler(vimfiler)
+  let prev_bufnr = bufnr('%')
 
   let windows = unite#helper#get_choose_windows()
+
   if empty(windows)
     rightbelow vnew
   elseif len(windows) == 1
-    execute windows[0].'wincmd w'
+    call vimfiler#util#winmove(windows[0])
   else
     let alt_winnr = winnr('#')
     let [tabnr, winnr] = [tabpagenr(), winnr()]
@@ -678,17 +676,14 @@ function! s:switch() "{{{
     if winnr == 0 || (winnr == old_winnr && tabnr == old_tabnr)
       rightbelow vnew
     else
-      execute winnr.'wincmd w'
+      call vimfiler#util#winmove(winnr)
     endif
   endif
 
-  if context.auto_cd
-    " Change current directory.
-    call vimfiler#mappings#_change_vim_current_dir()
-  endif
+  call vimfiler#handler#_event_bufwin_enter(prev_bufnr)
 endfunction"}}}
-function! s:toggle_mark_current_line(...) "{{{
-  let file = vimfiler#get_file()
+function! s:toggle_mark_current_line(...) abort "{{{
+  let file = vimfiler#get_file(b:vimfiler)
   if empty(file)
     " Don't toggle.
     return
@@ -723,8 +718,8 @@ function! s:toggle_mark_current_line(...) "{{{
     execute 'normal!' map
   endif
 endfunction"}}}
-function! s:mark_current_line() "{{{
-  let file = vimfiler#get_file()
+function! s:mark_current_line() abort "{{{
+  let file = vimfiler#get_file(b:vimfiler)
   if empty(file)
     " Don't toggle.
     return
@@ -742,8 +737,8 @@ function! s:mark_current_line() "{{{
     setlocal readonly
   endtry
 endfunction"}}}
-function! s:toggle_mark_all_lines() "{{{
-  for file in vimfiler#get_current_vimfiler().all_files
+function! s:toggle_mark_all_lines() abort "{{{
+  for file in b:vimfiler.all_files
     let file.vimfiler__is_marked = !file.vimfiler__is_marked
     let file.vimfiler__marked_time = localtime()
   endfor
@@ -754,8 +749,8 @@ function! s:toggle_mark_all_lines() "{{{
     call vimfiler#redraw_screen()
   endif
 endfunction"}}}
-function! s:mark_similar_lines() "{{{
-  let file = vimfiler#get_file()
+function! s:mark_similar_lines() abort "{{{
+  let file = vimfiler#get_file(b:vimfiler)
   if empty(file)
     " Don't toggle.
     return
@@ -773,8 +768,7 @@ function! s:mark_similar_lines() "{{{
   endwhile
 
   let pattern = join(idents, '.\+')
-  for file in filter(copy(
-        \ vimfiler#get_current_vimfiler().current_files),
+  for file in filter(copy(b:vimfiler.current_files),
         \ 'v:val.vimfiler__filename =~# pattern')
     let file.vimfiler__is_marked = 1
     let file.vimfiler__marked_time = localtime()
@@ -782,10 +776,10 @@ function! s:mark_similar_lines() "{{{
 
   call vimfiler#redraw_screen()
 endfunction"}}}
-function! s:toggle_mark_lines(start, end) "{{{
+function! s:toggle_mark_lines(start, end) abort "{{{
   let cnt = a:start
   while cnt <= a:end
-    let file = vimfiler#get_file(cnt)
+    let file = vimfiler#get_file(b:vimfiler, cnt)
     if !empty(file)
       " Toggle mark.
       let file.vimfiler__is_marked = !file.vimfiler__is_marked
@@ -797,14 +791,15 @@ function! s:toggle_mark_lines(start, end) "{{{
 
   call vimfiler#redraw_screen()
 endfunction"}}}
-function! s:clear_mark_all_lines() "{{{
-  for file in vimfiler#get_current_vimfiler().current_files
+function! s:clear_mark_all_lines(vimfiler) abort "{{{
+  for file in a:vimfiler.current_files
     let file.vimfiler__is_marked = 0
   endfor
 
   call vimfiler#redraw_screen()
 endfunction"}}}
-function! s:execute_vimfiler_associated() "{{{
+function! s:execute_vimfiler_associated() abort "{{{
+  let vimfiler = b:vimfiler
   let bufnr = bufnr('%')
   call s:switch()
   call unite#start(['vimfiler/execute'], {
@@ -813,12 +808,11 @@ function! s:execute_vimfiler_associated() "{{{
         \ 'script' : 1,
         \ 'vimfiler__winnr' : bufwinnr(bufnr),
         \ })
-  let vimfiler = vimfiler#get_current_vimfiler()
   call s:check_force_quit(vimfiler, '')
 endfunction"}}}
-function! s:execute_system_associated() "{{{
-  if empty(vimfiler#get_marked_files())
-    if empty(vimfiler#get_file())
+function! s:execute_system_associated() abort "{{{
+  if empty(vimfiler#get_marked_files(b:vimfiler))
+    if empty(vimfiler#get_file(b:vimfiler))
       call s:execute_external_filer()
       return
     endif
@@ -829,9 +823,9 @@ function! s:execute_system_associated() "{{{
 
   " Execute marked files.
   call vimfiler#mappings#do_dir_action(
-        \ 'vimfiler__execute', b:vimfiler.current_dir)
+        \ b:vimfiler, 'vimfiler__execute', b:vimfiler.current_dir)
 endfunction"}}}
-function! s:switch_to_other_window() "{{{
+function! s:switch_to_other_window() abort "{{{
   if winnr('$') != 1 || !exists('b:vimfiler')
     wincmd w
     return
@@ -839,7 +833,7 @@ function! s:switch_to_other_window() "{{{
 
   call s:switch_to_another_vimfiler()
 endfunction"}}}
-function! s:switch_to_another_vimfiler() "{{{
+function! s:switch_to_another_vimfiler() abort "{{{
   if vimfiler#exists_another_vimfiler()
     call vimfiler#mappings#switch_another_vimfiler()
   else
@@ -848,25 +842,25 @@ function! s:switch_to_another_vimfiler() "{{{
     call vimfiler#redraw_all_vimfiler()
   endif
 endfunction"}}}
-function! s:print_filename() "{{{
+function! s:print_filename() abort "{{{
   let filename = vimfiler#get_filename()
-  if filename != '..' && empty(vimfiler#get_file())
+  if filename != '..' && empty(vimfiler#get_file(b:vimfiler))
     let filename = matchstr(getline('.'),
           \ ' Current directory: \zs.*\ze[/\\]')
   endif
 
   echo filename
 endfunction"}}}
-function! s:yank_full_path() "{{{
-  let filename = join(vimfiler#get_marked_filenames(), "\n")
+function! s:yank_full_path() abort "{{{
+  let filename = join(vimfiler#get_marked_filenames(b:vimfiler), "\n")
 
   if filename == ''
     " Use cursor filename.
     let filename = vimfiler#get_filename()
-    if filename == '..' || empty(vimfiler#get_file())
-      let filename = vimfiler#get_current_vimfiler().current_dir
+    if filename == '..' || empty(vimfiler#get_file(b:vimfiler))
+      let filename = b:vimfiler.current_dir
     else
-      let filename = vimfiler#get_file().action__path
+      let filename = vimfiler#get_file(b:vimfiler).action__path
     endif
   endif
 
@@ -877,8 +871,8 @@ function! s:yank_full_path() "{{{
 
   echo 'Yanked: '.filename
 endfunction"}}}
-function! s:toggle_tree(is_recursive) "{{{
-  let file = vimfiler#get_file()
+function! s:toggle_tree(is_recursive) abort "{{{
+  let file = vimfiler#get_file(b:vimfiler)
   if empty(file) || vimfiler#get_filename() == '..'
     if vimfiler#get_filename() == '..'
       call vimfiler#mappings#cd('..')
@@ -889,7 +883,7 @@ function! s:toggle_tree(is_recursive) "{{{
   if !file.vimfiler__is_directory
     " Search parent directory.
     for cnt in reverse(range(1, line('.')-1))
-      let nest_level = get(vimfiler#get_file(cnt),
+      let nest_level = get(vimfiler#get_file(b:vimfiler, cnt),
             \ 'vimfiler__nest_level', -1)
       if (a:is_recursive && nest_level == 0) ||
             \ (!a:is_recursive &&
@@ -908,8 +902,8 @@ function! s:toggle_tree(is_recursive) "{{{
     call s:expand_tree(a:is_recursive)
   endif
 endfunction"}}}
-function! s:expand_tree(is_recursive) "{{{
-  let cursor_file = vimfiler#get_file()
+function! s:expand_tree(is_recursive) abort "{{{
+  let cursor_file = vimfiler#get_file(b:vimfiler)
   if empty(cursor_file) || vimfiler#get_filename() == '..'
     if vimfiler#get_filename() == '..'
       call vimfiler#mappings#cd('..')
@@ -920,7 +914,7 @@ function! s:expand_tree(is_recursive) "{{{
   if !cursor_file.vimfiler__is_directory
     " Search parent directory.
     for cnt in reverse(range(1, line('.')-1))
-      let nest_level = get(vimfiler#get_file(cnt),
+      let nest_level = get(vimfiler#get_file(b:vimfiler, cnt),
             \ 'vimfiler__nest_level', -1)
       if (a:is_recursive && nest_level == 0) ||
             \ (!a:is_recursive &&
@@ -968,10 +962,10 @@ function! s:expand_tree(is_recursive) "{{{
 
   if !a:is_recursive && !b:vimfiler.is_visible_ignore_files
     let files = vimfiler#helper#_call_filters(
-          \ files, vimfiler#get_context())
+          \ files, b:vimfiler.context)
   endif
 
-  let index = vimfiler#get_file_index(line('.'))
+  let index = vimfiler#get_file_index(b:vimfiler, line('.'))
   let index_orig =
         \ vimfiler#get_original_file_index(line('.'))
 
@@ -980,14 +974,14 @@ function! s:expand_tree(is_recursive) "{{{
   call extend(b:vimfiler.original_files, original_files, index_orig+1)
   let b:vimfiler.all_files_len += len(files)
 
-  if vimfiler#get_context().auto_expand
+  if b:vimfiler.context.auto_expand
         \ && !a:is_recursive && len(files) == 1
         \ && files[0].vimfiler__is_directory
     " Expand recursive.
     call cursor(line('.') + 1, 0)
     call s:expand_tree(a:is_recursive)
   elseif g:vimfiler_expand_jump_to_first_child && !a:is_recursive
-        \ || vimfiler#get_context().auto_expand
+        \ || b:vimfiler.context.auto_expand
     " Move to next line.
     call cursor(line('.') + 1, 0)
   endif
@@ -996,7 +990,7 @@ function! s:expand_tree(is_recursive) "{{{
   call vimfiler#view#_redraw_screen()
   call winrestview(savedView)
 endfunction"}}}
-function! vimfiler#mappings#expand_tree_rec(file, ...) "{{{
+function! vimfiler#mappings#expand_tree_rec(file, ...) abort "{{{
   if get(a:file, 'vimfiler__ftype', '') ==# 'link'
     " Ignore symbolic link.
     return []
@@ -1025,7 +1019,7 @@ function! vimfiler#mappings#expand_tree_rec(file, ...) "{{{
     " Open in cursor directory.
     let file = files[0]
     let file.vimfiler__parent =
-          \ !vimfiler#get_context().explorer &&
+          \ !b:vimfiler.context.explorer &&
           \   has_key(a:file, 'vimfiler__parent') ?
           \ a:file.vimfiler__parent : deepcopy(a:file)
     let file.vimfiler__abbr =
@@ -1066,8 +1060,8 @@ function! vimfiler#mappings#expand_tree_rec(file, ...) "{{{
 
   return _
 endfunction"}}}
-function! s:unexpand_tree() "{{{
-  let cursor_file = vimfiler#get_file()
+function! s:unexpand_tree() abort "{{{
+  let cursor_file = vimfiler#get_file(b:vimfiler)
   if empty(cursor_file) || vimfiler#get_filename() == '..'
     return
   endif
@@ -1077,7 +1071,7 @@ function! s:unexpand_tree() "{{{
         \ && !cursor_file.vimfiler__is_opened)
     " Search parent directory.
     for cnt in reverse(range(1, line('.')-1))
-      let nest_level = get(vimfiler#get_file(cnt),
+      let nest_level = get(vimfiler#get_file(b:vimfiler, cnt),
             \ 'vimfiler__nest_level', -1)
       if nest_level >= 0 && nest_level < cursor_file.vimfiler__nest_level
         call cursor(cnt, 0)
@@ -1114,7 +1108,7 @@ function! s:unexpand_tree() "{{{
   let nestlevel = cursor_file.vimfiler__nest_level
 
   " Search children.
-  let index = vimfiler#get_file_index(line('.'))
+  let index = vimfiler#get_file_index(b:vimfiler, line('.'))
   let end = index
   for cursor_file in b:vimfiler.current_files[index+1 :]
     if cursor_file.vimfiler__nest_level <= nestlevel
@@ -1149,17 +1143,17 @@ function! s:unexpand_tree() "{{{
     call winrestview(savedView)
   endif
 endfunction"}}}
-function! s:jump_child(is_first) "{{{
-  if empty(vimfiler#get_file())
+function! s:jump_child(is_first) abort "{{{
+  if empty(vimfiler#get_file(b:vimfiler))
     return
   endif
 
   let max = a:is_first ? b:vimfiler.prompt_linenr : line('$')
   let cnt = line('.')
-  let file = vimfiler#get_file(cnt)
+  let file = vimfiler#get_file(b:vimfiler, cnt)
   let level = file.vimfiler__nest_level
   while cnt != max
-    let file = vimfiler#get_file(cnt)
+    let file = vimfiler#get_file(b:vimfiler, cnt)
 
     if level > file.vimfiler__nest_level
       if a:is_first
@@ -1178,7 +1172,7 @@ function! s:jump_child(is_first) "{{{
     endif
   endwhile
 
-  if empty(vimfiler#get_file(cnt))
+  if empty(vimfiler#get_file(b:vimfiler, cnt))
     if a:is_first
       let cnt += 1
     else
@@ -1189,33 +1183,34 @@ function! s:jump_child(is_first) "{{{
   call cursor(cnt, 0)
 endfunction"}}}
 
-function! s:switch_to_drive() "{{{
+function! s:switch_to_drive() abort "{{{
   call unite#start(['vimfiler/drive'],
         \ { 'buffer_name' : 'vimfiler/drive', 'script' : 1 })
 endfunction"}}}
-function! s:switch_to_history_directory() "{{{
+function! s:switch_to_history_directory() abort "{{{
   call unite#start(['vimfiler/history'],
         \ { 'buffer_name' : 'vimfiler/history', 'script' : 1 })
 endfunction"}}}
-function! s:pushd() "{{{
+function! s:pushd() abort "{{{
   call unite#sources#vimfiler_popd#pushd()
 endfunction"}}}
-function! s:popd() "{{{
+function! s:popd() abort "{{{
   call unite#start(['vimfiler/popd'],
         \ { 'buffer_name' : 'vimfiler/popd', 'script' : 1 })
 endfunction"}}}
 
-function! s:toggle_visible_ignore_files() "{{{
+function! s:toggle_visible_ignore_files() abort "{{{
   let b:vimfiler.is_visible_ignore_files = !b:vimfiler.is_visible_ignore_files
   call vimfiler#redraw_screen()
 endfunction"}}}
-function! s:popup_shell() "{{{
-  call vimfiler#mappings#do_current_dir_action('vimfiler__shell', {
-        \ 'vimfiler__files' : vimfiler#get_escaped_marked_files(),
+function! s:popup_shell() abort "{{{
+  call vimfiler#mappings#do_current_dir_action(
+        \ b:vimfiler, 'vimfiler__shell', {
+        \ 'vimfiler__files' : vimfiler#get_escaped_marked_files(b:vimfiler),
         \})
 endfunction"}}}
-function! s:edit_binary_file() "{{{
-  let file = vimfiler#get_file()
+function! s:edit_binary_file() abort "{{{
+  let file = vimfiler#get_file(b:vimfiler)
   if empty(file)
     return
   endif
@@ -1230,11 +1225,12 @@ function! s:edit_binary_file() "{{{
 
   execute 'Vinarise' escape(vimfiler#get_filename(), ' ')
 endfunction"}}}
-function! s:execute_shell_command() "{{{
-  let marked_files = vimfiler#get_marked_files()
+function! s:execute_shell_command() abort "{{{
+  let marked_files = vimfiler#get_marked_files(b:vimfiler)
   if !empty(marked_files)
     echo 'Marked files:'
-    echohl Type | echo join(vimfiler#get_marked_filenames(), "\n") | echohl NONE
+    echohl Type | echo join(vimfiler#get_marked_filenames(
+          \                 b:vimfiler), "\n") | echohl NONE
   endif
 
   let command = input('Input shell command: ', '', 'shellcmd')
@@ -1249,11 +1245,11 @@ function! s:execute_shell_command() "{{{
   if special == '*'
     let command = substitute(command,
         \'\s\+\zs[*]\ze\%([;|[:space:]]\|$\)',
-        \ join(vimfiler#get_escaped_marked_files()), 'g')
+        \ join(vimfiler#get_escaped_marked_files(b:vimfiler)), 'g')
   elseif !empty(marked_files)
     let base_command = command
     let command = ''
-    for file in vimfiler#get_escaped_marked_files()
+    for file in vimfiler#get_escaped_marked_files(b:vimfiler)
       if special == '?'
         let command .= substitute(base_command,
               \'\s\+\zs[?]\ze\%([;|[:space:]]\|$\)', file, 'g') . '; '
@@ -1264,11 +1260,12 @@ function! s:execute_shell_command() "{{{
   endif
 
   call vimfiler#mappings#do_current_dir_action(
+        \ b:vimfiler,
         \ 'vimfiler__shellcmd', {
         \ 'vimfiler__command' : command,
         \})
 endfunction"}}}
-function! s:exit(vimfiler) "{{{
+function! s:exit(vimfiler) abort "{{{
   if !bufexists(a:vimfiler.bufnr)
     return
   endif
@@ -1278,35 +1275,30 @@ function! s:exit(vimfiler) "{{{
 
   if another_bufnr > 0
     " Exit another vimfiler.
-    execute bufwinnr(another_bufnr).'wincmd w'
+    call vimfiler#util#winmove(bufwinnr(another_bufnr))
     call vimfiler#util#delete_buffer(another_bufnr)
   endif
 endfunction"}}}
-function! s:close() "{{{
-  let bufnr = bufnr('%')
-
-  let context = vimfiler#get_context()
+function! s:close(vimfiler) abort "{{{
+  let context = a:vimfiler.context
 
   if vimfiler#winnr_another_vimfiler() > 0
     " Close current vimfiler.
-    let bufnr = b:vimfiler.another_vimfiler_bufnr
-    close
-    execute bufwinnr(bufnr).'wincmd w'
-    call vimfiler#redraw_screen()
-  elseif winnr('$') != 1 &&
-        \ (context.split || context.toggle)
-    close
+    call vimfiler#util#winclose(winnr(), context)
+    call vimfiler#force_redraw_all_vimfiler()
+  elseif winnr('$') != 1 && (context.split || context.toggle)
+    call vimfiler#util#winclose(bufwinnr(a:vimfiler.bufnr), context)
   else
-    call vimfiler#util#alternate_buffer()
+    call vimfiler#util#alternate_buffer(context)
   endif
 endfunction"}}}
-function! vimfiler#mappings#create_another_vimfiler() "{{{
-  let current_vimfiler = vimfiler#get_current_vimfiler()
+function! vimfiler#mappings#create_another_vimfiler() abort "{{{
+  let current_vimfiler = b:vimfiler
   let current_bufnr = bufnr('%')
   let line = line('.')
 
   " Create another vimfiler.
-  let original_context = deepcopy(vimfiler#get_context())
+  let original_context = deepcopy(b:vimfiler.context)
   let context = deepcopy(original_context)
   if context.split || context.explorer
     " Note: Horizontal automatically.
@@ -1334,22 +1326,21 @@ function! vimfiler#mappings#create_another_vimfiler() "{{{
   call vimfiler#helper#_set_cursor()
 
   let b:vimfiler.another_vimfiler_bufnr = current_bufnr
-  call vimfiler#set_current_vimfiler(b:vimfiler)
   let current_vimfiler.another_vimfiler_bufnr = bufnr('%')
 endfunction"}}}
-function! vimfiler#mappings#switch_another_vimfiler(...) "{{{
+function! vimfiler#mappings#switch_another_vimfiler(...) abort "{{{
   let directory = get(a:000, 0, '')
   if vimfiler#winnr_another_vimfiler() > 0
     " Switch to another vimfiler window.
-    execute vimfiler#winnr_another_vimfiler().'wincmd w'
+    call vimfiler#util#winmove(vimfiler#winnr_another_vimfiler())
     if directory != ''
       " Change current directory.
       call vimfiler#mappings#cd(directory)
     endif
   else
     " Open another vimfiler buffer.
-    let current_vimfiler = vimfiler#get_current_vimfiler()
-    let original_context = deepcopy(vimfiler#get_context())
+    let current_vimfiler = b:vimfiler
+    let original_context = deepcopy(b:vimfiler.context)
 
     let context = deepcopy(original_context)
     let context.split = 1
@@ -1368,7 +1359,7 @@ function! vimfiler#mappings#switch_another_vimfiler(...) "{{{
     let b:vimfiler.context.split = original_context.split
   endif
 endfunction"}}}
-function! s:sync_with_current_vimfiler() "{{{
+function! s:sync_with_current_vimfiler() abort "{{{
   " Search vimfiler window.
   let line = line('.')
   if vimfiler#exists_another_vimfiler()
@@ -1386,7 +1377,7 @@ function! s:sync_with_current_vimfiler() "{{{
   call cursor(line, 0)
   call vimfiler#redraw_screen()
 endfunction"}}}
-function! s:sync_with_another_vimfiler() "{{{
+function! s:sync_with_another_vimfiler() abort "{{{
   " Search vimfiler window.
   if vimfiler#exists_another_vimfiler()
     " Change current vimfiler directory.
@@ -1406,49 +1397,50 @@ function! s:sync_with_another_vimfiler() "{{{
 
   call cursor(line, 0)
 endfunction"}}}
-function! s:open_file_in_another_vimfiler() "{{{
+function! s:open_file_in_another_vimfiler() abort "{{{
+  let vimfiler = b:vimfiler
+
   " Search vimfiler window.
-  let files = vimfiler#get_marked_files()
+  let files = vimfiler#get_marked_files(vimfiler)
   if empty(files)
-    let files = [vimfiler#get_file()]
+    let files = [vimfiler#get_file(vimfiler)]
   endif
 
-  call s:clear_mark_all_lines()
+  call s:clear_mark_all_lines(vimfiler)
 
   call s:switch_to_other_window()
 
   if len(files) > 1 || !files[0].vimfiler__is_directory
     call vimfiler#mappings#do_files_action(
-          \ vimfiler#get_context().edit_action, files)
+          \ vimfiler, vimfiler.context.edit_action, files)
   else
     call vimfiler#mappings#cd(files[0].action__path)
   endif
 
   call s:switch_to_other_window()
 endfunction"}}}
-function! s:choose_action() "{{{
-  let marked_files = vimfiler#get_marked_files()
+function! s:choose_action() abort "{{{
+  let marked_files = vimfiler#get_marked_files(b:vimfiler)
   if empty(marked_files)
-    if empty(vimfiler#get_file())
+    if empty(vimfiler#get_file(b:vimfiler))
       return
     endif
 
-    let marked_files = [ vimfiler#get_file() ]
+    let marked_files = [ vimfiler#get_file(b:vimfiler) ]
   endif
 
   call unite#mappings#_choose_action(marked_files, {
-        \ 'vimfiler__current_directory' :
-        \   vimfiler#get_current_vimfiler().current_dir,
+        \ 'vimfiler__current_directory' : b:vimfiler.current_dir,
         \ })
 endfunction"}}}
-function! s:split_edit_file() "{{{
-  let context = vimfiler#get_context()
+function! s:split_edit_file() abort "{{{
+  let context = b:vimfiler.context
   let winwidth = (winnr('$') != 1) ?
         \ &columns - (winwidth(0)+1)/2*2 :
         \ (context.winwidth > 0) ?
         \ &columns / 2 :
         \ &columns - context.winwidth
-  call vimfiler#mappings#do_action(context.split_action)
+  call vimfiler#mappings#do_action(b:vimfiler, context.split_action)
 
   " Resize.
   execute 'vertical resize'
@@ -1458,8 +1450,8 @@ function! s:split_edit_file() "{{{
 endfunction"}}}
 
 " File operations.
-function! s:copy() "{{{
-  if empty(vimfiler#get_marked_files())
+function! s:copy() abort "{{{
+  if empty(vimfiler#get_marked_files(b:vimfiler))
     " Mark current line.
     call s:toggle_mark_current_line()
     return
@@ -1478,12 +1470,14 @@ function! s:copy() "{{{
 
   " Execute copy.
   call vimfiler#mappings#do_dir_action(
+        \ b:vimfiler,
         \ 'vimfiler__copy',
-        \ s:get_action_current_dir(vimfiler#get_marked_files()),
+        \ s:get_action_current_dir(
+        \   vimfiler#get_marked_files(b:vimfiler)),
         \ { 'action__directory' : dest_dir })
 endfunction"}}}
-function! s:move() "{{{
-  if empty(vimfiler#get_marked_files())
+function! s:move() abort "{{{
+  if empty(vimfiler#get_marked_files(b:vimfiler))
     " Mark current line.
     call s:toggle_mark_current_line()
     return
@@ -1502,12 +1496,14 @@ function! s:move() "{{{
 
   " Execute move.
   call vimfiler#mappings#do_dir_action(
+        \ b:vimfiler,
         \ 'vimfiler__move',
-        \ s:get_action_current_dir(vimfiler#get_marked_files()),
+        \ s:get_action_current_dir(
+        \  vimfiler#get_marked_files(b:vimfiler)),
         \ { 'action__directory' : dest_dir })
 endfunction"}}}
-function! s:delete() "{{{
-  if empty(vimfiler#get_marked_files())
+function! s:delete() abort "{{{
+  if empty(vimfiler#get_marked_files(b:vimfiler))
     " Mark current line.
     call s:toggle_mark_current_line()
     return
@@ -1515,50 +1511,55 @@ function! s:delete() "{{{
 
   " Execute delete.
   call vimfiler#mappings#do_dir_action(
+        \ b:vimfiler,
         \ 'vimfiler__delete',
-        \ s:get_action_current_dir(vimfiler#get_marked_files()))
+        \ s:get_action_current_dir(
+        \  vimfiler#get_marked_files(b:vimfiler)))
 endfunction"}}}
-function! s:rename() "{{{
-  if !empty(vimfiler#get_marked_filenames())
+function! s:rename() abort "{{{
+  let vimfiler = b:vimfiler
+  if !empty(vimfiler#get_marked_filenames(vimfiler))
     " Extended rename.
-    call vimfiler#exrename#create_buffer(vimfiler#get_marked_files())
-    call s:clear_mark_all_lines()
+    call vimfiler#exrename#create_buffer(
+          \ vimfiler#get_marked_files(vimfiler))
+    call s:clear_mark_all_lines(vimfiler)
     return
   endif
 
-  let file = vimfiler#get_file()
+  let file = vimfiler#get_file(vimfiler)
   if empty(file)
     return
   endif
 
   call vimfiler#mappings#do_files_action(
+        \ vimfiler,
         \ 'vimfiler__rename', [file], {
         \ 'vimfiler__current_directory' :
         \       s:get_action_current_dir([file]),
         \ })
 endfunction"}}}
-function! s:make_directory() "{{{
+function! s:make_directory() abort "{{{
   let directory = vimfiler#get_file_directory()
 
   " Don't quit.
-  let context = vimfiler#get_context()
+  let context = b:vimfiler.context
   let is_quit = context.quit
   try
     let context.quit = 0
-    call vimfiler#mappings#do_dir_action('vimfiler__mkdir', directory)
+    call vimfiler#mappings#do_dir_action(
+          \ b:vimfiler, 'vimfiler__mkdir', directory)
   finally
     let context.quit = is_quit
   endtry
 endfunction"}}}
-function! s:new_file() "{{{
+function! s:new_file() abort "{{{
   let directory = vimfiler#get_file_directory()
 
-  call s:switch()
-
-  call vimfiler#mappings#do_dir_action('vimfiler__newfile', directory)
+  call vimfiler#mappings#do_dir_action(
+        \ b:vimfiler, 'vimfiler__newfile', directory)
 endfunction"}}}
-function! s:clipboard_copy() "{{{
-  if empty(vimfiler#get_marked_files())
+function! s:clipboard_copy() abort "{{{
+  if empty(vimfiler#get_marked_files(b:vimfiler))
     " Mark current line.
     call s:toggle_mark_current_line()
     return
@@ -1566,13 +1567,13 @@ function! s:clipboard_copy() "{{{
 
   let clipboard = vimfiler#variables#get_clipboard()
   let clipboard.operation = 'copy'
-  let clipboard.files = vimfiler#get_marked_files()
-  call s:clear_mark_all_lines()
+  let clipboard.files = vimfiler#get_marked_files(b:vimfiler)
+  call s:clear_mark_all_lines(b:vimfiler)
 
   echo 'Copied files to vimfiler clipboard.'
 endfunction"}}}
-function! s:clipboard_move() "{{{
-  if empty(vimfiler#get_marked_files())
+function! s:clipboard_move() abort "{{{
+  if empty(vimfiler#get_marked_files(b:vimfiler))
     " Mark current line.
     call s:toggle_mark_current_line()
     return
@@ -1580,12 +1581,12 @@ function! s:clipboard_move() "{{{
 
   let clipboard = vimfiler#variables#get_clipboard()
   let clipboard.operation = 'move'
-  let clipboard.files = vimfiler#get_marked_files()
-  call s:clear_mark_all_lines()
+  let clipboard.files = vimfiler#get_marked_files(b:vimfiler)
+  call s:clear_mark_all_lines(b:vimfiler)
 
   echo 'Moved files to vimfiler clipboard.'
 endfunction"}}}
-function! s:clipboard_paste() "{{{
+function! s:clipboard_paste() abort "{{{
   let clipboard = vimfiler#variables#get_clipboard()
   if empty(clipboard.files)
     call vimfiler#util#print_error('Clipboard is empty.')
@@ -1597,6 +1598,7 @@ function! s:clipboard_paste() "{{{
 
   " Execute file operation.
   call vimfiler#mappings#do_files_action(
+        \ b:vimfiler,
         \ 'vimfiler__' . clipboard.operation,
         \ clipboard.files, {
         \ 'action__directory' : dest_dir,
@@ -1607,16 +1609,16 @@ function! s:clipboard_paste() "{{{
   let clipboard.files = []
 endfunction"}}}
 
-function! s:set_current_mask() "{{{
+function! s:set_current_mask() abort "{{{
   call vimfiler#redraw_screen()
   call unite#start(['vimfiler/mask'],
         \ { 'start_insert' : 1, 'buffer_name' : 'vimfiler/mask', 'script' : 1 })
 endfunction"}}}
-function! s:select_sort_type() "{{{
+function! s:select_sort_type() abort "{{{
   call unite#start(['vimfiler/sort'],
         \ { 'buffer_name' : 'vimfiler/sort', 'script' : 1 })
 endfunction"}}}
-function! s:switch_vim_buffer_mode() "{{{
+function! s:switch_vim_buffer_mode() abort "{{{
   redir => nmaps
   silent nmap <buffer>
   redir END
@@ -1635,28 +1637,30 @@ function! s:switch_vim_buffer_mode() "{{{
 
   echo 'Switched vim buffer mode'
 endfunction"}}}
-function! s:restore_vimfiler_mode() "{{{
+function! s:restore_vimfiler_mode() abort "{{{
   for [lhs, rhs] in items(b:vimfiler.mapdict)
     execute 'nmap <buffer>' lhs rhs
   endfor
 
   echo 'Switched vimfiler mode'
 endfunction"}}}
-function! s:help() "{{{
+function! s:help() abort "{{{
   call unite#start(['mapping'],
         \ { 'buffer_name' : 'vimfiler/mapping', 'script' : 1 })
 endfunction"}}}
-function! s:execute_external_filer() "{{{
-  let file = vimfiler#get_file()
+function! s:execute_external_filer() abort "{{{
+  let file = vimfiler#get_file(b:vimfiler)
   if empty(file)
     " Use current directory
-    call vimfiler#mappings#do_current_dir_action('vimfiler__execute')
+    call vimfiler#mappings#do_current_dir_action(
+          \ b:vimfiler, 'vimfiler__execute')
   else
-    call vimfiler#mappings#do_files_action('vimfiler__external_filer', [file])
+    call vimfiler#mappings#do_files_action(
+          \ b:vimfiler, 'vimfiler__external_filer', [file])
   endif
 endfunction"}}}
-function! vimfiler#mappings#_change_vim_current_dir() "{{{
-  let vimfiler = vimfiler#get_current_vimfiler()
+function! vimfiler#mappings#_change_vim_current_dir() abort "{{{
+  let vimfiler = b:vimfiler
   if vimfiler.source !=# 'file'
     call vimfiler#util#print_error(
           \ 'Invalid operation in not file source.')
@@ -1669,7 +1673,7 @@ function! vimfiler#mappings#_change_vim_current_dir() "{{{
   execute g:unite_kind_cdable_lcd_command
         \ fnameescape(vimfiler.current_dir)
 endfunction"}}}
-function! s:grep() "{{{
+function! s:grep() abort "{{{
   if !vimfiler#util#has_vimproc()
     call vimfiler#util#print_error(
           \ 'Sorry, vimproc is not installed. '.
@@ -1679,15 +1683,17 @@ function! s:grep() "{{{
 
   call unite#sources#grep#define()
 
+  let vimfiler = b:vimfiler
+
   call s:switch()
 
-  if empty(vimfiler#get_marked_files())
-    call vimfiler#mappings#do_current_dir_action('grep')
+  if empty(vimfiler#get_marked_files(vimfiler))
+    call vimfiler#mappings#do_current_dir_action(vimfiler, 'grep')
   else
-    call vimfiler#mappings#do_action('grep')
+    call vimfiler#mappings#do_action(vimfiler, 'grep')
   endif
 endfunction"}}}
-function! s:find() "{{{
+function! s:find() abort "{{{
   if !vimfiler#util#has_vimproc()
     call vimfiler#util#print_error(
           \ 'Sorry, vimproc is not installed. '.
@@ -1697,23 +1703,25 @@ function! s:find() "{{{
 
   call unite#sources#find#define()
 
+  let vimfiler = b:vimfiler
+
   call s:switch()
 
-  call vimfiler#mappings#do_current_dir_action('find')
+  call vimfiler#mappings#do_current_dir_action(vimfiler, 'find')
 endfunction"}}}
-function! s:cd_file_directory() "{{{
+function! s:cd_file_directory() abort "{{{
   " Change directory.
   call vimfiler#mappings#cd(vimfiler#get_filename())
 
-  if vimfiler#get_context().auto_expand
+  if b:vimfiler.context.auto_expand
         \ && b:vimfiler.all_files_len == 1
         \ && b:vimfiler.all_files[0].vimfiler__is_directory
     " Cd recursive
     call s:cd_file_directory()
   endif
 endfunction"}}}
-function! s:cd_input_directory() "{{{
-  let vimfiler = vimfiler#get_current_vimfiler()
+function! s:cd_input_directory() abort "{{{
+  let vimfiler = b:vimfiler
   let current_dir = vimfiler.current_dir
   let dir = input('[in]: ',
         \ vimfiler.source . ':'. current_dir,
@@ -1727,8 +1735,8 @@ function! s:cd_input_directory() "{{{
   " Change directory.
   call vimfiler#mappings#cd(dir)
 endfunction"}}}
-function! s:on_double_click() "{{{
-  let file = vimfiler#get_file()
+function! s:on_double_click() abort "{{{
+  let file = vimfiler#get_file(b:vimfiler)
   if empty(file)
         \ || !file.vimfiler__is_directory
     if vimfiler#get_filename() ==# '..'
@@ -1740,14 +1748,14 @@ function! s:on_double_click() "{{{
     call s:toggle_tree(0)
   endif
 endfunction"}}}
-function! s:quick_look() "{{{
+function! s:quick_look() abort "{{{
   if !vimfiler#util#has_vimproc()
     call vimfiler#util#print_error(
           \ 'vimproc is needed for this feature.')
     return
   endif
 
-  let file = vimfiler#get_file()
+  let file = vimfiler#get_file(b:vimfiler)
   if empty(file)
     return
   endif
@@ -1767,7 +1775,7 @@ function! s:quick_look() "{{{
 endfunction"}}}
 
 " For safe mode.
-function! s:toggle_safe_mode() "{{{
+function! s:toggle_safe_mode() abort "{{{
   let b:vimfiler.is_safe_mode = !b:vimfiler.is_safe_mode
   echo 'Safe mode is ' . (b:vimfiler.is_safe_mode ? 'enabled' : 'disabled')
   call vimfiler#view#_redraw_screen()
@@ -1778,7 +1786,7 @@ function! s:toggle_safe_mode() "{{{
     call s:mapping_file_operations()
   endif
 endfunction"}}}
-function! s:mapping_file_operations() "{{{
+function! s:mapping_file_operations() abort "{{{
   nnoremap <buffer><silent> <Plug>(vimfiler_copy_file)
         \ :<C-u>call <SID>copy()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_move_file)
@@ -1798,7 +1806,7 @@ function! s:mapping_file_operations() "{{{
   nnoremap <buffer><silent> <Plug>(vimfiler_clipboard_paste)
         \ :<C-u>call <SID>clipboard_paste()<CR>
 endfunction"}}}
-function! s:unmapping_file_operations() "{{{
+function! s:unmapping_file_operations() abort "{{{
   nnoremap <buffer><silent> <Plug>(vimfiler_copy_file)
         \ :<C-u>call <SID>disable_operation()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_move_file)
@@ -1818,19 +1826,19 @@ function! s:unmapping_file_operations() "{{{
   nnoremap <buffer><silent> <Plug>(vimfiler_clipboard_paste)
         \ :<C-u>call <SID>disable_operation()<CR>
 endfunction"}}}
-function! s:disable_operation() "{{{
+function! s:disable_operation() abort "{{{
   call vimfiler#util#print_error(
         \ 'In safe mode, this operation is disabled.')
 endfunction"}}}
 
-function! s:toggle_simple_mode() "{{{
+function! s:toggle_simple_mode() abort "{{{
   let b:vimfiler.context.simple = !b:vimfiler.context.simple
   call vimfiler#redraw_screen()
   echo 'Simple mode is ' .
         \ (b:vimfiler.context.simple ? 'enabled' : 'disabled')
 endfunction"}}}
-function! s:toggle_maximize_window() "{{{
-  let std_width = vimfiler#get_context().winwidth
+function! s:toggle_maximize_window() abort "{{{
+  let std_width = b:vimfiler.context.winwidth
   if std_width == 0
     let std_width = (&columns+1)/2
   endif
@@ -1847,7 +1855,7 @@ function! s:toggle_maximize_window() "{{{
   setlocal winfixwidth
 endfunction"}}}
 
-function! s:get_action_current_dir(files) "{{{
+function! s:get_action_current_dir(files) abort "{{{
   let current_dir = b:vimfiler.current_dir
   if b:vimfiler.source != 'file'
     let current_dir = b:vimfiler.source . ':' . current_dir
@@ -1863,29 +1871,31 @@ function! s:get_action_current_dir(files) "{{{
   return current_dir
 endfunction"}}}
 
-function! s:get_abbr_length(parent, child) "{{{
+function! s:get_abbr_length(parent, child) abort "{{{
   return strwidth(repeat(' ', a:parent.vimfiler__nest_level
         \  * g:vimfiler_tree_indentation) .
         \ a:parent.vimfiler__abbr.a:child.vimfiler__abbr) + 5
 endfunction"}}}
 
-function! s:check_force_quit(vimfiler, action) "{{{
+function! s:check_force_quit(vimfiler, action) abort "{{{
   if (a:vimfiler.context.force_quit || a:vimfiler.context.force_hide)
         \ && index([
         \  'vimfiler__move', 'vimfiler__copy', 'vimfiler__delete',
-        \  'vimfiler__rename', 'vimfiler__mkdir',
+        \  'vimfiler__rename', 'vimfiler__mkdir', 'vimfiler__newfile',
         \ ], a:action) < 0
     if a:vimfiler.context.force_quit
       call s:exit(a:vimfiler)
     else
-      call s:close()
+      call vimfiler#util#hide_buffer(a:vimfiler.bufnr)
     endif
   endif
 endfunction"}}}
 
-function! s:check_opened() "{{{
-  return get(vimfiler#get_file(), 'vimfiler__is_opened', 0)
-        \ || get(vimfiler#get_file(), 'vimfiler__nest_level', 0) > 0
+function! s:check_opened() abort "{{{
+  return     get(vimfiler#get_file(b:vimfiler),
+        \        'vimfiler__is_opened', 0)
+        \ || get(vimfiler#get_file(b:vimfiler),
+        \        'vimfiler__nest_level', 0) > 0
 endfunction"}}}
 
 " vim: foldmethod=marker

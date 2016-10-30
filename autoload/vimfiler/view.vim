@@ -29,9 +29,9 @@ set cpo&vim
 let g:vimfiler_min_cache_files =
       \ get(g:, 'vimfiler_min_cache_files', 100)
 
-let s:Cache = vimfiler#util#get_vital().import('System.Cache')
+let s:Cache = vimfiler#util#get_vital_cache()
 
-function! vimfiler#view#_force_redraw_screen(...) "{{{
+function! vimfiler#view#_force_redraw_screen(...) abort "{{{
   let is_manualed = get(a:000, 0, 0)
 
   let old_original_files = {}
@@ -94,27 +94,17 @@ function! vimfiler#view#_force_redraw_screen(...) "{{{
 
   call vimfiler#view#_redraw_screen()
 endfunction"}}}
-function! vimfiler#view#_redraw_screen(...) "{{{
-  let is_switch = &filetype !=# 'vimfiler'
-  let save_winnr = winnr()
-  if is_switch
-    " Switch vimfiler.
-    let vimfiler = vimfiler#get_current_vimfiler()
-
-    let winnr = bufwinnr(vimfiler.bufnr)
-    if winnr < 0
-      " Not vimfiler window.
-      return
-    endif
-
-    execute winnr . 'wincmd w'
+function! vimfiler#view#_redraw_screen(...) abort "{{{
+  if &filetype !=# 'vimfiler'
+    " Not vimfiler window.
+    return
   endif
 
   if !has_key(b:vimfiler, 'original_files')
     return
   endif
 
-  let current_file = vimfiler#get_file()
+  let current_file = vimfiler#get_file(b:vimfiler)
 
   let b:vimfiler.all_files =
         \ unite#filters#matcher_vimfiler_mask#define().filter(
@@ -122,7 +112,7 @@ function! vimfiler#view#_redraw_screen(...) "{{{
         \ { 'input' : b:vimfiler.current_mask })
   if !b:vimfiler.is_visible_ignore_files
     let b:vimfiler.all_files = vimfiler#helper#_call_filters(
-          \ b:vimfiler.all_files, vimfiler#get_context())
+          \ b:vimfiler.all_files, b:vimfiler.context)
     let b:vimfiler.all_files =
           \ s:check_tree(b:vimfiler.all_files)
   endif
@@ -162,16 +152,12 @@ function! vimfiler#view#_redraw_screen(...) "{{{
 
   let index = index(b:vimfiler.current_files, current_file)
   if index >= 0
-    call cursor(vimfiler#get_line_number(index), 0)
+    call cursor(vimfiler#get_line_number(b:vimfiler, index), 0)
   else
     call cursor(last_line, 0)
   endif
-
-  if is_switch
-    execute save_winnr . 'wincmd w'
-  endif
 endfunction"}}}
-function! vimfiler#view#_force_redraw_all_vimfiler(...) "{{{
+function! vimfiler#view#_force_redraw_all_vimfiler(...) abort "{{{
   let is_manualed = get(a:000, 0, 0)
 
   let current_nr = winnr()
@@ -180,30 +166,27 @@ function! vimfiler#view#_force_redraw_all_vimfiler(...) "{{{
     " Search vimfiler window.
     for winnr in filter(range(1, winnr('$')),
           \ "getwinvar(v:val, '&filetype') ==# 'vimfiler'")
-      execute winnr . 'wincmd w'
+      call vimfiler#util#winmove(winnr)
       call vimfiler#view#_force_redraw_screen(is_manualed)
     endfor
   finally
-    execute current_nr . 'wincmd w'
+    call vimfiler#util#winmove(current_nr)
   endtry
 endfunction"}}}
-function! vimfiler#view#_redraw_all_vimfiler() "{{{
+function! vimfiler#view#_redraw_all_vimfiler() abort "{{{
   let current_nr = winnr()
-  let bufnr = 1
-  while bufnr <= winnr('$')
+  try
     " Search vimfiler window.
-    if getwinvar(bufnr, '&filetype') ==# 'vimfiler'
-
-      execute bufnr . 'wincmd w'
+    for winnr in filter(range(1, winnr('$')),
+          \ "getwinvar(v:val, '&filetype') ==# 'vimfiler'")
+      call vimfiler#util#winmove(winnr)
       call vimfiler#view#_redraw_screen()
-    endif
-
-    let bufnr += 1
-  endwhile
-
-  execute current_nr . 'wincmd w'
+    endfor
+  finally
+    call vimfiler#util#winmove(current_nr)
+  endtry
 endfunction"}}}
-function! s:redraw_prompt() "{{{
+function! s:redraw_prompt() abort "{{{
   if &filetype !=# 'vimfiler'
     return
   endif
@@ -237,7 +220,7 @@ function! s:redraw_prompt() "{{{
   endif
   let b:vimfiler.status = prefix .  dir . mask . sort . safe
 
-  let context = vimfiler#get_context()
+  let context = b:vimfiler.context
 
   " Append up directory.
   let modifiable_save = &l:modifiable
@@ -270,7 +253,7 @@ function! s:redraw_prompt() "{{{
     let &l:readonly = readonly_save
   endtry
 endfunction"}}}
-function! vimfiler#view#_get_print_lines(files) "{{{
+function! vimfiler#view#_get_print_lines(files) abort "{{{
   " Clear previous syntax.
   for syntax in b:vimfiler.syntaxes
     silent! execute 'syntax clear' syntax
@@ -339,7 +322,7 @@ function! vimfiler#view#_get_print_lines(files) "{{{
 
   return lines
 endfunction"}}}
-function! vimfiler#view#_get_max_len(files) "{{{
+function! vimfiler#view#_get_max_len(files) abort "{{{
   let columns = (b:vimfiler.context.simple) ? [] : b:vimfiler.columns
 
   for column in columns
@@ -366,16 +349,20 @@ function! vimfiler#view#_get_max_len(files) "{{{
     silent execute 'sign unplace buffer='.bufnr('%')
   endif
 
-  return max([winwidth(0) - padding, 10])
+  let max_len = max([winwidth(0) - padding, 10])
+  if b:vimfiler.context.fnamewidth > 0
+    let max_len = min([max_len, b:vimfiler.context.fnamewidth])
+  endif
+  return max_len
 endfunction"}}}
-function! vimfiler#view#_define_syntax() "{{{
+function! vimfiler#view#_define_syntax() abort "{{{
   for column in filter(
         \ copy(b:vimfiler.columns), "get(v:val, 'syntax', '') != ''")
     call column.define_syntax(b:vimfiler.context)
   endfor
 endfunction"}}}
 
-function! s:check_tree(files) "{{{
+function! s:check_tree(files) abort "{{{
   let level = 0
   let _ = []
   for file in a:files

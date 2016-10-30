@@ -26,36 +26,46 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-let s:V = vital#of('vimfiler')
-
-function! vimfiler#util#get_vital() "{{{
+function! vimfiler#util#get_vital() abort "{{{
+  if !exists('s:V')
+    let s:V = vital#vimfiler#of()
+  endif
   return s:V
 endfunction"}}}
-function! s:get_prelude() "{{{
+function! vimfiler#util#get_vital_cache() abort "{{{
+  if !exists('s:Cache')
+    let s:Cache = vimfiler#util#get_vital().import('System.Cache.Deprecated')
+  endif
+  return s:Cache
+endfunction"}}}
+function! vimfiler#util#get_vital_buffer() abort "{{{
+  return vimfiler#util#get_vital().import('Vim.Buffer')
+endfunction"}}}
+function! s:get_prelude() abort "{{{
   if !exists('s:Prelude')
     let s:Prelude = vimfiler#util#get_vital().import('Prelude')
   endif
   return s:Prelude
 endfunction"}}}
-function! s:get_list() "{{{
+function! s:get_list() abort "{{{
   if !exists('s:List')
     let s:List = vimfiler#util#get_vital().import('Data.List')
   endif
   return s:List
 endfunction"}}}
-function! s:get_message() "{{{
+function! s:get_message() abort "{{{
   if !exists('s:Message')
     let s:Message = vimfiler#util#get_vital().import('Vim.Message')
   endif
   return s:Message
 endfunction"}}}
-function! s:get_process() "{{{
+function! s:get_process() abort "{{{
   if !exists('s:Process')
     let s:Process = vimfiler#util#get_vital().import('Process')
   endif
   return s:Process
 endfunction"}}}
-function! s:get_string() "{{{
+function! s:get_string() abort "{{{
   if !exists('s:String')
     let s:String = vimfiler#util#get_vital().import('Data.String')
   endif
@@ -64,94 +74,94 @@ endfunction"}}}
 
 let s:is_windows = has('win16') || has('win32') || has('win64')
 
-function! vimfiler#util#truncate_smart(...)
+function! vimfiler#util#truncate_smart(...) abort
   return call(s:get_string().truncate_skipping, a:000)
 endfunction
-function! vimfiler#util#truncate(...)
+function! vimfiler#util#truncate(...) abort
   return call(s:get_string().truncate, a:000)
 endfunction
-function! vimfiler#util#is_windows(...)
+function! vimfiler#util#is_windows(...) abort
   return s:is_windows
 endfunction
-function! vimfiler#util#is_win_path(path)
+function! vimfiler#util#is_win_path(path) abort
   return a:path =~ '^\a\?:' || a:path =~ '^\\\\[^\\]\+\\'
 endfunction
-function! vimfiler#util#print_error(msg)
+function! vimfiler#util#print_error(msg) abort
   let msg = '[vimfiler] ' . a:msg
   return call(s:get_message().error, [msg])
 endfunction
-function! vimfiler#util#escape_file_searching(...)
+function! vimfiler#util#escape_file_searching(...) abort
   return call(s:get_prelude().escape_file_searching, a:000)
 endfunction
-function! vimfiler#util#escape_pattern(...)
-  return call(s:get_prelude().escape_pattern, a:000)
+function! vimfiler#util#escape_pattern(...) abort
+  return call(s:get_string().escape_pattern, a:000)
 endfunction
-function! vimfiler#util#set_default(...)
+function! vimfiler#util#set_default(...) abort
   return call(s:get_prelude().set_default, a:000)
 endfunction
-function! vimfiler#util#set_dictionary_helper(...)
+function! vimfiler#util#set_dictionary_helper(...) abort
   return call(s:get_prelude().set_dictionary_helper, a:000)
 endfunction
-function! vimfiler#util#substitute_path_separator(...)
+function! vimfiler#util#substitute_path_separator(...) abort
   return call(s:get_prelude().substitute_path_separator, a:000)
 endfunction
-function! vimfiler#util#path2directory(...)
+function! vimfiler#util#path2directory(...) abort
   return call(s:get_prelude().path2directory, a:000)
 endfunction
-function! vimfiler#util#path2project_directory(...)
+function! vimfiler#util#path2project_directory(...) abort
   return call(s:get_prelude().path2project_directory, a:000)
 endfunction
-function! vimfiler#util#has_vimproc(...)
+function! vimfiler#util#has_vimproc(...) abort
   return call(s:get_process().has_vimproc, a:000)
 endfunction
-function! vimfiler#util#system(...)
+function! vimfiler#util#system(...) abort
   return call(s:get_process().system, a:000)
 endfunction
-function! vimfiler#util#get_last_status(...)
+function! vimfiler#util#get_last_status(...) abort
   return call(s:get_process().get_last_status, a:000)
 endfunction
-function! vimfiler#util#sort_by(...)
+function! vimfiler#util#sort_by(...) abort
   return call(s:get_list().sort_by, a:000)
 endfunction
-function! vimfiler#util#escape_file_searching(...)
+function! vimfiler#util#escape_file_searching(...) abort
   return call(s:get_prelude().escape_file_searching, a:000)
 endfunction
 
-function! vimfiler#util#has_lua()
+function! vimfiler#util#has_lua() abort
   " Note: Disabled if_lua feature if less than 7.3.885.
   " Because if_lua has double free problem.
   return has('lua') && (v:version > 703 || v:version == 703 && has('patch885'))
 endfunction
 
-function! vimfiler#util#is_cmdwin() "{{{
+function! vimfiler#util#is_cmdwin() abort "{{{
   return bufname('%') ==# '[Command Line]'
 endfunction"}}}
 
-function! vimfiler#util#expand(path) "{{{
+function! vimfiler#util#expand(path) abort "{{{
   return s:get_prelude().substitute_path_separator(
         \ (a:path =~ '^\~') ? substitute(a:path, '^\~', expand('~'), '') :
         \ (a:path =~ '^\$\h\w*') ? substitute(a:path,
         \               '^\$\h\w*', '\=eval(submatch(0))', '') :
         \ a:path)
 endfunction"}}}
-function! vimfiler#util#set_default_dictionary_helper(variable, keys, value) "{{{
+function! vimfiler#util#set_default_dictionary_helper(variable, keys, value) abort "{{{
   for key in split(a:keys, '\s*,\s*')
     if !has_key(a:variable, key)
       let a:variable[key] = a:value
     endif
   endfor
 endfunction"}}}
-function! vimfiler#util#set_dictionary_helper(variable, keys, value) "{{{
+function! vimfiler#util#set_dictionary_helper(variable, keys, value) abort "{{{
   for key in split(a:keys, '\s*,\s*')
     let a:variable[key] = a:value
   endfor
 endfunction"}}}
-function! vimfiler#util#resolve(filename) "{{{
+function! vimfiler#util#resolve(filename) abort "{{{
   return ((vimfiler#util#is_windows() && fnamemodify(a:filename, ':e') ==? 'LNK') || getftype(a:filename) ==# 'link') ?
         \ vimfiler#util#substitute_path_separator(resolve(a:filename)) : a:filename
 endfunction"}}}
 
-function! vimfiler#util#set_variables(variables) "{{{
+function! vimfiler#util#set_variables(variables) abort "{{{
   let variables_save = {}
   for [key, value] in items(a:variables)
     let save_value = exists(key) ? eval(key) : ''
@@ -162,43 +172,35 @@ function! vimfiler#util#set_variables(variables) "{{{
 
   return variables_save
 endfunction"}}}
-function! vimfiler#util#restore_variables(variables_save) "{{{
+function! vimfiler#util#restore_variables(variables_save) abort "{{{
   for [key, value] in items(a:variables_save)
     execute 'let' key '=' string(value)
   endfor
 endfunction"}}}
 
-function! vimfiler#util#hide_buffer() "{{{
-  let bufnr = bufnr('%')
+function! vimfiler#util#hide_buffer(...) abort "{{{
+  let bufnr = get(a:000, 0, bufnr('%'))
 
-  let context = vimfiler#get_context()
+  let vimfiler = getbufvar(bufnr, 'vimfiler')
+  let context = vimfiler.context
 
   if vimfiler#winnr_another_vimfiler() > 0
     " Hide another vimfiler.
-    let bufnr = b:vimfiler.another_vimfiler_bufnr
-    close!
-    execute bufwinnr(bufnr).'wincmd w'
+    call vimfiler#util#winclose(
+          \ bufwinnr(vimfiler.another_vimfiler_bufnr), context)
     call vimfiler#util#hide_buffer()
-  elseif winnr('$') != 1 && exists('b:vimfiler')
-        \ && (context.split || context.toggle)
-    close!
-    if winbufnr(context.vimfiler__prev_winnr)
-          \ != context.vimfiler__prev_bufnr
-      execute bufwinnr(context.vimfiler__prev_bufnr) . 'wincmd w'
-    else
-      execute context.vimfiler__prev_winnr . 'wincmd w'
-    endif
+  elseif winnr('$') != 1 && (context.split || context.toggle)
+    call vimfiler#util#winclose(bufwinnr(bufnr), context)
   else
-    call vimfiler#util#alternate_buffer()
+    call vimfiler#util#alternate_buffer(context)
   endif
 endfunction"}}}
-function! vimfiler#util#alternate_buffer() "{{{
-  let context = vimfiler#get_context()
-
-  if s:buflisted(context.alternate_buffer)
-        \ && getbufvar(context.alternate_buffer, '&filetype') !=# 'vimfiler'
+function! vimfiler#util#alternate_buffer(context) abort "{{{
+  if s:buflisted(a:context.alternate_buffer)
+        \ && getbufvar(a:context.alternate_buffer, '&filetype') !=# 'vimfiler'
         \ && g:vimfiler_restore_alternate_file
-    execute 'buffer' context.alternate_buffer
+    execute 'buffer' a:context.alternate_buffer
+    keepjumps call winrestview(a:context.prev_winsaveview)
     return
   endif
 
@@ -216,23 +218,23 @@ function! vimfiler#util#alternate_buffer() "{{{
 
   silent call vimfiler#force_redraw_all_vimfiler()
 endfunction"}}}
-function! vimfiler#util#delete_buffer(...) "{{{
-  let delete_bufnr = get(a:000, 0, bufnr('%'))
+function! vimfiler#util#delete_buffer(...) abort "{{{
+  let bufnr = get(a:000, 0, bufnr('%'))
 
-  call vimfiler#util#hide_buffer()
+  call vimfiler#util#hide_buffer(bufnr)
 
-  silent execute 'bwipeout!' delete_bufnr
+  silent execute 'bwipeout!' bufnr
 endfunction"}}}
-function! s:buflisted(bufnr) "{{{
+function! s:buflisted(bufnr) abort "{{{
   return exists('t:tabpagebuffer') ?
         \ has_key(t:tabpagebuffer, a:bufnr) && buflisted(a:bufnr) :
         \ buflisted(a:bufnr)
 endfunction"}}}
 
-function! vimfiler#util#convert2list(expr) "{{{
-  return type(a:expr) ==# type([]) ? a:expr : [a:expr]
+function! vimfiler#util#convert2list(expr) abort "{{{
+  return type(a:expr) ==# type([]) ? copy(a:expr) : [a:expr]
 endfunction"}}}
-function! vimfiler#util#get_vimfiler_winnr(buffer_name) "{{{
+function! vimfiler#util#get_vimfiler_winnr(buffer_name) abort "{{{
   for winnr in filter(range(1, winnr('$')),
         \ "getbufvar(winbufnr(v:val), '&filetype') =~# 'vimfiler'")
     let buffer_context = getbufvar(
@@ -245,10 +247,27 @@ function! vimfiler#util#get_vimfiler_winnr(buffer_name) "{{{
   return -1
 endfunction"}}}
 
-function! vimfiler#util#is_sudo() "{{{
+function! vimfiler#util#is_sudo() abort "{{{
   return $SUDO_USER != '' && $USER !=# $SUDO_USER
         \ && $HOME !=# expand('~'.$USER)
         \ && $HOME ==# expand('~'.$SUDO_USER)
+endfunction"}}}
+
+function! vimfiler#util#winmove(winnr) abort "{{{
+  if a:winnr > 0
+    silent execute a:winnr.'wincmd w'
+  endif
+endfunction"}}}
+function! vimfiler#util#winclose(winnr, context) abort "{{{
+  if winnr('$') != 1
+    let winnr = (winnr() == a:winnr) ? winnr('#') : winnr()
+    let prev_winnr = (winnr < a:winnr) ? winnr : winnr - 1
+    call vimfiler#util#winmove(a:winnr)
+    close!
+    call vimfiler#util#winmove(prev_winnr)
+  else
+    call vimfiler#util#alternate_buffer(a:context)
+  endif
 endfunction"}}}
 
 let &cpo = s:save_cpo
